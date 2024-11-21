@@ -242,5 +242,93 @@ export class TestManager extends EventEmitter {
     }
   }
 
-  // ... 其他通信相关方法保持不变 ...
+  private broadcastToTeachers(message: any) {
+    if (!this.wss) return
+  
+    this.wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        try {
+          const isTeacher = (client as any)._isTeacher
+          if (isTeacher) {
+            client.send(JSON.stringify(message))
+          }
+        } catch (error) {
+          console.error('Error broadcasting to teachers:', error)
+        }
+      }
+    })
+  }
+  
+  private sendToClient(ws: WebSocket, message: any) {
+    if (ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify(message))
+      } catch (error) {
+        console.error('Error sending to client:', error)
+      }
+    }
+  }
+  
+  startTest(testData: any) {
+    this.test = testData
+    this.currentQuestionIndex = 0
+    this.initializeStats()
+  
+    this.wss?.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        this.sendToClient(client, {
+          type: 'test-start',
+          currentQuestionIndex: this.currentQuestionIndex,
+          totalQuestions: this.test.sequences.length,
+          options: this.test.sequences[0].options,
+          instruction: this.test.instruction,
+          lightSettings: this.test.lightSettings
+        })
+      }
+    })
+  }
+  
+  nextQuestion() {
+    if (!this.test || this.currentQuestionIndex >= this.test.sequences.length - 1) return
+  
+    this.currentQuestionIndex++
+    const question = this.test.sequences[this.currentQuestionIndex]
+  
+    this.wss?.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        this.sendToClient(client, {
+          type: 'next-question',
+          questionIndex: this.currentQuestionIndex,
+          options: question.options
+        })
+      }
+    })
+  }
+  
+  endTest() {
+    if (!this.test) return
+  
+    this.wss?.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        this.sendToClient(client, {
+          type: 'test-end',
+          stats: this.stats
+        })
+      }
+    })
+  
+    // Reset test state
+    this.test = null
+    this.currentQuestionIndex = -1
+    this.stats = null
+  }
+  
+  stopServer() {
+    if (this.wss) {
+      this.wss.close(() => {
+        console.log('WebSocket server closed')
+      })
+      this.wss = null
+    }
+  }
 }
