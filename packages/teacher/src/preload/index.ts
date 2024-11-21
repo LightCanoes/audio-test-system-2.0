@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createTestWindow: (testData: any) => ipcRenderer.invoke('create-test-window', testData),
   createStudentWindow: () => ipcRenderer.invoke('create-student-window'),
 
+  // 测试数据相关
+  saveTestData: (data: any) => ipcRenderer.invoke('save-test-data', data),
+  loadTestData: () => ipcRenderer.invoke('load-test-data'),
+
   // 测试控制
   startTest: (testData: any) => ipcRenderer.invoke('start-test', testData),
   nextQuestion: () => ipcRenderer.invoke('next-question'),
@@ -36,6 +40,8 @@ declare global {
       startTest: (testData: any) => Promise<void>
       nextQuestion: () => Promise<void>
       endTest: () => Promise<void>
+      saveTestData: (data: any) => Promise<void>
+      loadTestData: () => Promise<any>
       onTestStateUpdate: (callback: (state: any) => void) => void
       onInitTestData: (callback: (data: any) => void) => void
     }
