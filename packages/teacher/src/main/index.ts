@@ -2,12 +2,14 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { AudioManager } from './audioManager'
 import { TestManager } from './testManager'
+import { DataManager } from './dataManager'
 
 let mainWindow: BrowserWindow | null = null
 let testWindow: BrowserWindow | null = null
 let studentWindow: BrowserWindow | null = null
 let audioManager: AudioManager | null = null
 let testManager: TestManager | null = null
+let dataManager: DataManager | null = null
 
 const createMainWindow = () => {
   mainWindow = new BrowserWindow({
@@ -101,43 +103,40 @@ const createStudentWindow = async () => {
 }
 
 // 设置IPC处理程序
+// 确保IPC处理程序在窗口创建之前注册
 const setupIpcHandlers = () => {
+  // 音频相关
+  ipcMain.handle('play-audio', (event, path) => audioManager?.playAudio(path))
+  ipcMain.handle('pause-audio', () => audioManager?.pauseAudio())
+  ipcMain.handle('resume-audio', () => audioManager?.resumeAudio())
+  ipcMain.handle('stop-audio', () => audioManager?.stopAudio())
+  ipcMain.handle('get-audio-files', () => audioManager?.getAudioFiles())
+  ipcMain.handle('import-audio-files', () => audioManager?.importAudioFiles())
+  ipcMain.handle('delete-audio-file', (event, fileId) => audioManager?.deleteAudioFile(fileId))
+
+  // 数据管理相关
+  ipcMain.handle('save-test-data', async (event, data) => {
+    try {
+      await dataManager?.saveTestData(data)
+    } catch (error) {
+      console.error('Failed to save test data:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('load-test-data', async () => {
+    try {
+      return await dataManager?.loadTestData()
+    } catch (error) {
+      console.error('Failed to load test data:', error)
+      throw error
+    }
+  })
+
   // 测试窗口相关
   ipcMain.handle('create-test-window', async (event, testData) => {
     await createTestWindow(testData)
   })
-
-  // 学生窗口相关
-  ipcMain.handle('create-student-window', async () => {
-    await createStudentWindow()
-  })
-
-  // 音频相关
-  ipcMain.handle('play-audio', (event, path) => {
-    return audioManager?.playAudio(path)
-  })
-
-  ipcMain.handle('stop-audio', () => {
-    return audioManager?.stopAudio()
-  })
-
-  // 测试管理相关
-  ipcMain.handle('start-test', (event, testData) => {
-    testManager?.startTest(testData)
-  })
-
-  ipcMain.handle('next-question', () => {
-    testManager?.nextQuestion()
-  })
-
-  ipcMain.handle('end-test', () => {
-    testManager?.endTest()
-  })
-
-  // 音频文件管理
-  ipcMain.handle('get-audio-files', () => audioManager?.getAudioFiles())
-  ipcMain.handle('import-audio-files', () => audioManager?.importAudioFiles())
-  ipcMain.handle('delete-audio-file', (event, fileId) => audioManager?.deleteAudioFile(fileId))
 }
 
 // 添加开发菜单（便于测试）
@@ -164,19 +163,20 @@ const createDevMenu = () => {
 }
 
 app.whenReady().then(async () => {
-  createMainWindow()
-  
-  // 初始化管理器
+  // 先初始化所有管理器
   audioManager = new AudioManager(app.getPath('userData'))
   await audioManager.loadInitialFiles()
+  
+  dataManager = new DataManager(app.getPath('userData'))
+  await dataManager.init()
   
   testManager = new TestManager()
 
   // 设置IPC处理程序
   setupIpcHandlers()
 
-  // 开发菜单
-  createDevMenu()
+  // 然后创建窗口
+  createMainWindow()
 })
 
 app.on('window-all-closed', () => {

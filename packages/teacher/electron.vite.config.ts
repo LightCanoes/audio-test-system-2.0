@@ -1,11 +1,12 @@
 import { defineConfig } from 'electron-vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
+import tailwindcss from 'tailwindcss'
+import autoprefixer from 'autoprefixer'
 
 export default defineConfig({
   main: {
     build: {
-      outDir: 'dist/main',
       rollupOptions: {
         external: ['ws']
       }
@@ -13,7 +14,6 @@ export default defineConfig({
   },
   preload: {
     build: {
-      outDir: 'dist/preload',
       rollupOptions: {
         external: ['ws']
       }
@@ -22,7 +22,6 @@ export default defineConfig({
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
     build: {
-      outDir: 'dist/renderer',
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/renderer/index.html')
@@ -35,6 +34,14 @@ export default defineConfig({
         '@': resolve(__dirname, 'src/renderer')
       }
     },
-    plugins: [vue()]
+    plugins: [vue()],
+    css: {
+      postcss: {
+        plugins: [
+          tailwindcss,
+          autoprefixer
+        ]
+      }
+    }
   }
 })
