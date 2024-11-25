@@ -159,6 +159,7 @@
   <script setup lang="ts">
   import { ref, computed, onMounted, onUnmounted } from 'vue'
   import { WebSocketClient } from '../utils/websocket'
+  import type { TestOption, TestSettings } from '../types'
   
   // 状態管理
   const connectionStatus = ref<'connecting' | 'connected' | 'disconnected'>('connecting')

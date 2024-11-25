@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import { EventEmitter } from 'events'
+import type { TestSettings, TestSequence } from '../renderer/types'
 
 interface Answer {
   questionId: number
@@ -42,7 +43,7 @@ interface TestStats {
 export class TestManager extends EventEmitter {
   private wss: WebSocketServer | null = null
   private students: Map<string, Student> = new Map()
-  private test: any = null
+  private test: TestSettings | null = null
   private currentQuestionIndex: number = -1
   private stats: TestStats | null = null
 
@@ -269,7 +270,7 @@ export class TestManager extends EventEmitter {
     }
   }
   
-  startTest(testData: any) {
+  startTest(testData: TestSettings) {
     this.test = testData
     this.currentQuestionIndex = 0
     this.initializeStats()

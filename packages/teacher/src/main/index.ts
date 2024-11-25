@@ -3,6 +3,7 @@ import { join } from 'path'
 import { AudioManager } from './audioManager'
 import { TestManager } from './testManager'
 import { DataManager } from './dataManager'
+import type { TestSettings } from '../renderer/types'
 
 let mainWindow: BrowserWindow | null = null
 let testWindow: BrowserWindow | null = null
@@ -115,7 +116,7 @@ const setupIpcHandlers = () => {
   ipcMain.handle('delete-audio-file', (event, fileId) => audioManager?.deleteAudioFile(fileId))
 
   // 数据管理相关
-  ipcMain.handle('save-test-data', async (event, data) => {
+  ipcMain.handle('save-test-data', async (event, data: TestSettings) => {
     try {
       await dataManager?.saveTestData(data)
     } catch (error) {
@@ -134,7 +135,7 @@ const setupIpcHandlers = () => {
   })
 
   // 测试窗口相关
-  ipcMain.handle('create-test-window', async (event, testData) => {
+  ipcMain.handle('create-test-window', async (event, testData: TestSettings) => {
     await createTestWindow(testData)
   })
 }

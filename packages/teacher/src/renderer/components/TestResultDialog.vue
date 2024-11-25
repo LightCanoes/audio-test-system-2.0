@@ -130,12 +130,14 @@
   <script setup lang="ts">
   import { XMarkIcon } from '@heroicons/vue/24/solid'
   
-  interface Props {
-    show: boolean
-    stats: any
-    test: any
-    totalQuestions: number
-  }
+  import type { TestSettings } from '../types'
+
+interface Props {
+  show: boolean
+  stats: any // 可以根据需要定义具体的统计类型
+  test: TestSettings
+  totalQuestions: number
+}
   
   const props = defineProps<Props>()
   const emit = defineEmits<{

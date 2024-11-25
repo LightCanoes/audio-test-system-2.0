@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
 import { promises as fs } from 'fs'
+import type { TestSettings } from '../renderer/types'
 
 export class DataManager {
   private dataDir: string
@@ -20,7 +21,7 @@ export class DataManager {
     }
   }
 
-  async saveTestData(data: any) {
+  async saveTestData(data: TestSettings) {
     try {
       // 移除循环引用并序列化
       const cleanData = JSON.parse(JSON.stringify(data))
@@ -31,14 +32,13 @@ export class DataManager {
     }
   }
 
-  async loadTestData() {
+  async loadTestData(): Promise<TestSettings | null> {
     try {
       const data = await fs.readFile(this.testDataPath, 'utf-8')
       return JSON.parse(data)
     } catch (error) {
-      // 如果文件不存在，返回空数据
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return { sequences: [] }
+        return null
       }
       console.error('Failed to load test data:', error)
       throw error

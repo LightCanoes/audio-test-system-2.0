@@ -1,19 +1,12 @@
 import { join } from 'path'
 import { promises as fs } from 'fs'
-import { app, dialog } from 'electron'
+import { app, dialog, BrowserWindow } from 'electron'
 import { v4 as uuidv4 } from 'uuid'
-
-interface AudioFile {
-  id: string
-  path: string
-  name: string
-  originalPath: string
-}
+import type { AudioFile } from '../types'
 
 export class AudioManager {
   private audioDir: string
   private files: Map<string, AudioFile> = new Map()
-  private audioPlayer: HTMLAudioElement | null = null
 
   constructor(userDataPath: string) {
     this.audioDir = join(userDataPath, 'audio')
@@ -27,11 +20,11 @@ export class AudioManager {
       for (const file of files) {
         if (file.endsWith('.wav') || file.endsWith('.mp3')) {
           const filePath = join(this.audioDir, file)
-          const id = file.split('_')[0] // Extract UUID from filename
+          const id = file.split('_')[0]
           this.files.set(id, {
             id,
             path: filePath,
-            name: file.split('_')[1] || file, // Get original name if exists
+            name: file.split('_')[1] || file,
             originalPath: filePath
           })
         }
@@ -96,32 +89,48 @@ export class AudioManager {
     if (fileIds) {
       return fileIds
         .map(id => this.files.get(id))
-        .filter(file => file !== undefined)
+        .filter((file): file is AudioFile => file !== undefined)
     }
     return Array.from(this.files.values())
   }
 
-  async playAudio(fileId: string) {
+  // 音频播放控制
+  playAudio(fileId: string) {
     const file = this.files.get(fileId)
     if (!file) return false
 
-    // If there's a playing audio, stop it first
-    if (this.audioPlayer) {
-      this.audioPlayer.pause()
-      this.audioPlayer.currentTime = 0
+    const window = BrowserWindow.getFocusedWindow()
+    if (window) {
+      window.webContents.send('audio-control', { type: 'play', path: file.path, id: file.id })
+      return true
     }
+    return false
+  }
 
-    this.audioPlayer = new Audio(file.path)
-    await this.audioPlayer.play()
-    
-    return true
+  pauseAudio() {
+    const window = BrowserWindow.getFocusedWindow()
+    if (window) {
+      window.webContents.send('audio-control', { type: 'pause' })
+      return true
+    }
+    return false
+  }
+
+  resumeAudio() {
+    const window = BrowserWindow.getFocusedWindow()
+    if (window) {
+      window.webContents.send('audio-control', { type: 'resume' })
+      return true
+    }
+    return false
   }
 
   stopAudio() {
-    if (this.audioPlayer) {
-      this.audioPlayer.pause()
-      this.audioPlayer.currentTime = 0
-      this.audioPlayer = null
+    const window = BrowserWindow.getFocusedWindow()
+    if (window) {
+      window.webContents.send('audio-control', { type: 'stop' })
+      return true
     }
+    return false
   }
 }
