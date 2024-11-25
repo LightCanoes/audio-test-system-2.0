@@ -7,21 +7,26 @@ import autoprefixer from 'autoprefixer'
 export default defineConfig({
   main: {
     build: {
+      outDir: 'dist/main',
       rollupOptions: {
         external: ['ws']
       }
-    }
+    },
+    entry: 'src/main/index.ts' // 添加这个入口配置
   },
   preload: {
     build: {
+      outDir: 'dist/preload',
       rollupOptions: {
         external: ['ws']
       }
-    }
+    },
+    entry: 'src/preload/index.ts' // 添加这个入口配置
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
     build: {
+      outDir: 'dist/renderer',
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/renderer/index.html')
