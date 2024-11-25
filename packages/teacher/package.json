@@ -19,8 +19,11 @@
     "ws": "^8.13.0"
   },
   "devDependencies": {
+    "@types/electron": "^1.4.38",
+    "@types/lodash": "^4.17.13",
     "@types/node": "^20.0.0",
     "@types/uuid": "^9.0.0",
+    "@types/vuedraggable": "^2.23.2",
     "@types/ws": "^8.5.0",
     "@vitejs/plugin-vue": "^4.2.0",
     "autoprefixer": "^10.4.0",

@@ -24,20 +24,27 @@ const createMainWindow = () => {
 
   if (!app.isPackaged) {
     mainWindow.loadURL('http://localhost:5173')
+    mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+
+  // 设置 AudioManager 的主窗口引用
+  audioManager?.setMainWindow(mainWindow)
 }
 
 const createTestWindow = async (testData: any) => {
-  // 如果测试窗口已存在则聚焦
   if (testWindow) {
     testWindow.focus()
     return
   }
 
-  // 启动WebSocket服务器
-  testManager?.startServer()
+  // 启动 WebSocket 服务器
+  await testManager?.startServer()
 
   testWindow = new BrowserWindow({
     width: 1400,
@@ -61,16 +68,20 @@ const createTestWindow = async (testData: any) => {
     testWindow?.webContents.send('init-test-data', testData)
   })
 
+  if (!app.isPackaged) {
+    testWindow.webContents.openDevTools()
+  }
+
   testWindow.on('closed', () => {
     testWindow = null
-    // 停止WebSocket服务器
     testManager?.stopServer()
-    // 关闭所有学生窗口
     if (studentWindow) {
       studentWindow.close()
       studentWindow = null
     }
   })
+
+  audioManager?.setMainWindow(testWindow)
 }
 
 const createStudentWindow = async () => {
@@ -91,6 +102,7 @@ const createStudentWindow = async () => {
 
   if (!app.isPackaged) {
     await studentWindow.loadURL('http://localhost:5173/#/student')
+    studentWindow.webContents.openDevTools()
   } else {
     await studentWindow.loadFile(join(__dirname, '../renderer/index.html'), {
       hash: 'student'
@@ -102,20 +114,32 @@ const createStudentWindow = async () => {
   })
 }
 
-// 设置IPC处理程序
-// 确保IPC处理程序在窗口创建之前注册
 const setupIpcHandlers = () => {
-  // 音频相关
-  ipcMain.handle('play-audio', (event, path) => audioManager?.playAudio(path))
-  ipcMain.handle('pause-audio', () => audioManager?.pauseAudio())
-  ipcMain.handle('resume-audio', () => audioManager?.resumeAudio())
+  // 窗口管理
+  ipcMain.handle('create-test-window', async (event, testData) => {
+    await createTestWindow(testData)
+  })
+
+  ipcMain.handle('create-student-window', async () => {
+    await createStudentWindow()
+  })
+
+  // 音频管理
+  ipcMain.handle('play-audio', async (_event, fileId) => {
+    try {
+      return await audioManager?.playAudio(fileId)
+    } catch (error) {
+      console.error('Failed to play audio:', error)
+      throw error
+    }
+  })
   ipcMain.handle('stop-audio', () => audioManager?.stopAudio())
   ipcMain.handle('get-audio-files', () => audioManager?.getAudioFiles())
   ipcMain.handle('import-audio-files', () => audioManager?.importAudioFiles())
   ipcMain.handle('delete-audio-file', (event, fileId) => audioManager?.deleteAudioFile(fileId))
 
   // 数据管理相关
-  ipcMain.handle('save-test-data', async (event, data) => {
+  ipcMain.handle('save-test-data', async (_event, data) => {
     try {
       await dataManager?.saveTestData(data)
     } catch (error) {
@@ -133,37 +157,22 @@ const setupIpcHandlers = () => {
     }
   })
 
-  // 测试窗口相关
-  ipcMain.handle('create-test-window', async (event, testData) => {
-    await createTestWindow(testData)
+  // 测试管理
+  ipcMain.handle('start-test', (event, testData) => {
+    testManager?.startTest(testData)
+  })
+
+  ipcMain.handle('next-question', () => {
+    testManager?.nextQuestion()
+  })
+
+  ipcMain.handle('end-test', () => {
+    testManager?.endTest()
   })
 }
 
-// 添加开发菜单（便于测试）
-const createDevMenu = () => {
-  if (!app.isPackaged) {
-    mainWindow?.webContents.on('context-menu', (_, params) => {
-      const menu = require('electron').Menu.buildFromTemplate([
-        {
-          label: '打开开发者工具',
-          click: () => mainWindow?.webContents.openDevTools()
-        },
-        {
-          label: 'テストビューを開く',
-          click: () => createTestWindow({})
-        },
-        {
-          label: '学生ビューを開く',
-          click: () => createStudentWindow()
-        }
-      ])
-      menu.popup()
-    })
-  }
-}
-
 app.whenReady().then(async () => {
-  // 先初始化所有管理器
+  // 初始化管理器
   audioManager = new AudioManager(app.getPath('userData'))
   await audioManager.loadInitialFiles()
   
@@ -172,10 +181,10 @@ app.whenReady().then(async () => {
   
   testManager = new TestManager()
 
-  // 设置IPC处理程序
+  // 设置 IPC 处理程序
   setupIpcHandlers()
 
-  // 然后创建窗口
+  // 创建主窗口
   createMainWindow()
 })
 
@@ -191,7 +200,6 @@ app.on('activate', () => {
   }
 })
 
-// 确保应用退出时清理资源
 app.on('before-quit', () => {
   testManager?.stopServer()
 })
