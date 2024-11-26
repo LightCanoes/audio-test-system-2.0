@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, protocol } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { AudioManager } from './audioManager'
 import { TestManager } from './testManager'
 import { DataManager } from './dataManager'
 import { networkInterfaces } from 'os'
+import type { TestSettings } from '../renderer/types'
 
 let mainWindow: BrowserWindow | null = null
 let testWindow: BrowserWindow | null = null
@@ -13,8 +14,8 @@ let dataManager: DataManager | null = null
 
 const createMainWindow = () => {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1600,  // 更大的默认窗口尺寸
+    height: 900,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -29,17 +30,17 @@ const createMainWindow = () => {
   }
 }
 
-const createTestWindow = async (testData: any) => {
+const createTestWindow = async (testData: TestSettings) => {
   if (testWindow) {
     testWindow.focus()
     return
   }
 
-  // 启动WebSocket服务器
+  // WebSocketサーバーを起動
   testManager?.startServer()
 
   testWindow = new BrowserWindow({
-    width: 1400,
+    width: 1600,
     height: 900,
     webPreferences: {
       nodeIntegration: false,
@@ -67,16 +68,30 @@ const createTestWindow = async (testData: any) => {
 }
 
 const setupIpcHandlers = () => {
-  // 音频相关
-  ipcMain.handle('play-audio', (event, fileId) => audioManager?.playAudio(fileId))
-  ipcMain.handle('pause-audio', () => audioManager?.pauseAudio())
-  ipcMain.handle('resume-audio', () => audioManager?.resumeAudio())
-  ipcMain.handle('stop-audio', () => audioManager?.stopAudio())
+  // 音声ファイル管理
   ipcMain.handle('get-audio-files', () => audioManager?.getAudioFiles())
-  ipcMain.handle('import-audio-files', () => audioManager?.importAudioFiles())
-  ipcMain.handle('delete-audio-file', (event, fileId) => audioManager?.deleteAudioFile(fileId))
+  ipcMain.handle('select-audio-files', () => audioManager?.importAudioFiles())
+  ipcMain.handle('delete-audio-file', (_, fileId) => audioManager?.deleteAudioFile(fileId))
 
-  // 获取网络地址
+  // 音声再生制御
+  ipcMain.handle('play-audio', (event, fileId) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    return audioManager?.playAudio(fileId, window)
+  })
+  ipcMain.handle('pause-audio', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    return audioManager?.pauseAudio(window)
+  })
+  ipcMain.handle('resume-audio', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    return audioManager?.resumeAudio(window)
+  })
+  ipcMain.handle('stop-audio', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    return audioManager?.stopAudio(window)
+  })
+
+  // ネットワークアドレス取得
   ipcMain.handle('get-network-addresses', () => {
     const nets = networkInterfaces()
     const addresses: string[] = []
@@ -95,8 +110,8 @@ const setupIpcHandlers = () => {
     return addresses
   })
 
-  // 数据管理相关
-  ipcMain.handle('save-test-data', async (event, data) => {
+  // データ管理
+  ipcMain.handle('save-test-data', async (_, data) => {
     try {
       await dataManager?.saveTestData(data)
     } catch (error) {
@@ -114,12 +129,12 @@ const setupIpcHandlers = () => {
     }
   })
 
-  // 测试窗口相关
-  ipcMain.handle('create-test-window', async (event, testData) => {
+  // テストウィンドウ管理
+  ipcMain.handle('create-test-window', async (_, testData) => {
     await createTestWindow(testData)
   })
 
-  // 文件管理相关
+  // ファイル管理
   ipcMain.handle('save-test-settings-to-file', () => {
     return dataManager?.saveTestSettingsToFile()
   })
@@ -127,28 +142,28 @@ const setupIpcHandlers = () => {
   ipcMain.handle('load-test-settings-from-file', () => {
     return dataManager?.loadTestSettingsFromFile()
   })
+
+  // テスト制御
+  ipcMain.handle('start-test', (_, data) => testManager?.startTest(data))
+  ipcMain.handle('pause-test', () => testManager?.pauseTest())
+  ipcMain.handle('resume-test', () => testManager?.resumeTest())
+  ipcMain.handle('stop-test', () => testManager?.stopTest())
+  ipcMain.handle('next-question', () => testManager?.nextQuestion())
 }
 
 app.whenReady().then(async () => {
-  // 注册自定义协议
-  protocol.registerFileProtocol('audio-file', (request, callback) => {
-    const filePath = decodeURIComponent(request.url.replace('audio-file://', ''))
-    callback({ path: filePath })
-  })
-
-  // 初始化管理器
-  audioManager = new AudioManager(app.getPath('userData'))
-  await audioManager.loadInitialFiles()
+  // 各マネージャーの初期化
+  audioManager = new AudioManager()
   
   dataManager = new DataManager(app.getPath('userData'))
   await dataManager.init()
   
   testManager = new TestManager()
 
-  // 设置IPC处理程序
+  // IPC ハンドラーの設定
   setupIpcHandlers()
 
-  // 创建窗口
+  // メインウィンドウの作成
   createMainWindow()
 })
 

@@ -1,4 +1,3 @@
-// src/renderer/utils/websocket.ts
 export class WebSocketClient {
   private ws: WebSocket | null = null
   private reconnectAttempts = 0
@@ -26,7 +25,7 @@ export class WebSocketClient {
       this.reconnectAttempts = 0
       this.emit('connection-status', 'connected')
       
-      // 发送等待的消息
+      // 接続時に保留中のメッセージを送信
       while (this.pendingMessages.length > 0) {
         const message = this.pendingMessages.shift()
         this.send(message)
@@ -81,7 +80,13 @@ export class WebSocketClient {
 
   send(message: any) {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(message))
+      try {
+        const stringMessage = JSON.stringify(message)
+        this.ws.send(stringMessage)
+      } catch (error) {
+        console.error('Error sending message:', error)
+        this.pendingMessages.push(message)
+      }
     } else {
       this.pendingMessages.push(message)
     }
@@ -91,6 +96,8 @@ export class WebSocketClient {
     if (this.ws) {
       this.ws.close()
       this.ws = null
+      this.handlers.clear()
+      this.pendingMessages = []
     }
   }
 }

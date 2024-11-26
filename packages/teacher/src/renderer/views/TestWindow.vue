@@ -259,8 +259,32 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import TestResultDialog from '../components/TestResultDialog.vue'
-import type { TestSettings, TestSequence } from '../types'
+import type { 
+  TestSettings, 
+  TestSequence, 
+  AudioFile, 
+  StudentStats, 
+  QuestionStats 
+} from '../types'
 import { getServerAddress } from '../utils/network'
+
+// 更新状态类型
+interface TestState {
+  currentQuestion: number
+  currentStage: 'wait' | 'audio1' | 'pause' | 'audio2' | 'answer' | null
+  isPlaying: boolean
+  isPaused: boolean
+  showingAnswer: boolean
+  students: StudentStats[]
+  stats: {
+    current: QuestionStats
+    all: QuestionStats[]
+    overall: {
+      correctRate: number
+      averageTime: number
+    }
+  }
+}
 
 // 状態管理
 const isStarted = ref(false)

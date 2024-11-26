@@ -5,35 +5,38 @@ export interface AudioFile {
   name: string
   path: string
   originalPath: string
+  comment?: string  // 追加コメント欄
 }
 
 export interface TestOption {
-  value: string
-  label: string
+  value: string    // ボタンID
+  label: string    // ボタン表示名
 }
 
 export interface TestSequence {
-  id: string       // draggable のために必要
-  waitTime: number // 開始待ち時間（秒）
-  audio1: string   // 音声ファイル1のID
-  pauseTime: number // 休止時間（秒）
-  audio2: string   // 音声ファイル2のID
-  answerTime: number // 回答時間（秒）
-  correctOption: string // 正解選択肢の value
+  id: string           // draggable のために必要
+  repeatCount: number  // 反復回数
+  waitTime: number     // 開始時間（秒）
+  audio1: string       // 刺激1のID
+  pauseTime: number    // 休止時間（秒）
+  audio2: string       // 刺激2のID
+  answerTime: number   // 制限時間（秒）
+  correctOption: string // 正答ボタンのID
 }
 
 export interface LightSettings {
-  showPlayingIndicator: boolean  // 音源呈示提示灯
-  showCorrectLight: boolean      // 正解提示灯
-  showWrongLight: boolean        // 不正解提示灯
-  showAlmostLight: boolean       // おしい提示灯
+  showPlayingIndicator: boolean  // 音源呈示ランプ
+  showCorrectLight: boolean      // 正解ランプ
+  showWrongLight: boolean        // 不正解ランプ
+  showAlmostLight: boolean       // おしいランプ
 }
 
 export interface TestSettings {
   instruction: string          // 教示文
-  options: TestOption[]        // 回答選択肢
-  sequences: TestSequence[]    // シーケンス
-  lightSettings: LightSettings // 提示灯設定
+  options: TestOption[]        // ボタン設定
+  sequences: TestSequence[]    // スケジュールリスト
+  lightSettings: LightSettings // ランプ設定
+  audioFiles?: AudioFile[]     // 保存用の刺激リスト
 }
 
 export interface StudentStats {

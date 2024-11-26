@@ -25,10 +25,10 @@
     </div>
 
     <!-- メインコンテンツ -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- 左側：音源管理と基本設定 -->
-      <div class="space-y-6">
-        <!-- 音源管理 -->
+    <div class="grid grid-cols-10 gap-6">
+      <!-- 左側：刺激リストと基本設定 -->
+      <div class="col-span-4 space-y-6">
+        <!-- 刺激リスト -->
         <div class="bg-white rounded-lg shadow p-4">
           <AudioFiles @files-updated="handleAudioFilesUpdate" />
         </div>
@@ -55,37 +55,47 @@
           </div>
 
           <div class="p-4">
-            <!-- 回答選択肢設定 -->
-            <div v-if="currentTab === 'options'" class="space-y-4">
+            <!-- ボタン設定 -->
+            <div v-if="currentTab === 'buttons'" class="space-y-4">
               <div class="flex justify-between items-center">
-                <h3 class="font-medium">回答選択肢</h3>
+                <h3 class="font-medium">ボタン設定</h3>
                 <button
-                  @click="addOption"
+                  @click="addButton"
                   class="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
-                  選択肢を追加
+                  追加
                 </button>
               </div>
 
-              <div class="space-y-2">
-                <div
-                  v-for="(option, index) in testSettings.options"
-                  :key="index"
-                  class="flex items-center space-x-2"
-                >
-                  <input
-                    v-model="option.label"
-                    class="flex-grow p-2 border rounded"
-                    placeholder="選択肢のラベル"
-                  />
-                  <button
-                    @click="deleteOption(index)"
-                    class="p-2 text-red-500 hover:text-red-600"
-                  >
-                    <TrashIcon class="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
+              <table class="w-full">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-2 py-1 text-left w-20">ID</th>
+                    <th class="px-2 py-1 text-left">ラベル</th>
+                    <th class="w-16"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(button, index) in testSettings.options" :key="index">
+                    <td class="px-2 py-1">{{ button.value }}</td>
+                    <td class="px-2 py-1">
+                      <input
+                        v-model="button.label"
+                        class="w-full p-2 border rounded"
+                        placeholder="ラベル"
+                      />
+                    </td>
+                    <td class="px-2 py-1">
+                      <button
+                        @click="deleteButton(index)"
+                        class="p-1 text-red-500 hover:text-red-600"
+                      >
+                        <TrashIcon class="w-5 h-5" />
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
             <!-- 教示文設定 -->
@@ -98,15 +108,15 @@
               ></textarea>
             </div>
 
-            <!-- 提示灯設定 -->
-            <div v-if="currentTab === 'lights'" class="space-y-4">
+            <!-- ランプ設定 -->
+            <div v-if="currentTab === 'lamps'" class="space-y-4">
               <div class="space-y-2">
                 <label class="flex items-center space-x-2">
                   <input
                     type="checkbox"
                     v-model="testSettings.lightSettings.showPlayingIndicator"
                   />
-                  <span>音源呈示提示灯を表示</span>
+                  <span>音源呈示ランプを表示</span>
                 </label>
                 
                 <label class="flex items-center space-x-2">
@@ -114,7 +124,7 @@
                     type="checkbox"
                     v-model="testSettings.lightSettings.showCorrectLight"
                   />
-                  <span>正解提示灯を表示</span>
+                  <span>正解ランプを表示</span>
                 </label>
                 
                 <label class="flex items-center space-x-2">
@@ -122,7 +132,7 @@
                     type="checkbox"
                     v-model="testSettings.lightSettings.showWrongLight"
                   />
-                  <span>不正解提示灯を表示</span>
+                  <span>不正解ランプを表示</span>
                 </label>
                 
                 <label class="flex items-center space-x-2">
@@ -130,7 +140,7 @@
                     type="checkbox"
                     v-model="testSettings.lightSettings.showAlmostLight"
                   />
-                  <span>おしい提示灯を表示</span>
+                  <span>おしいランプを表示</span>
                 </label>
               </div>
             </div>
@@ -138,189 +148,138 @@
         </div>
       </div>
 
-      <!-- 右側：シーケンス設定 -->
-      <div class="bg-white rounded-lg shadow p-4">
+      <!-- 右側：スケジュールリスト -->
+      <div class="col-span-6 bg-white rounded-lg shadow p-4">
         <div class="flex justify-between items-center mb-4">
-          <h3 class="font-medium">シーケンス設定</h3>
+          <h3 class="font-medium">スケジュールリスト</h3>
           <button
             @click="addSequence"
             class="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
           >
-            シーケンスを追加
+            追加
           </button>
         </div>
 
-        <!-- シーケンスリスト -->
-        <draggable
-          v-model="testSettings.sequences"
-          item-key="id"
-          class="space-y-4"
-          handle=".drag-handle"
-        >
-          <template #item="{ element: sequence, index }">
-            <div class="border rounded p-4">
-              <div class="flex justify-between items-center mb-4">
-                <div class="flex items-center space-x-2">
-                  <button class="drag-handle cursor-move p-1">
-                    <Bars3Icon class="w-5 h-5 text-gray-400" />
-                  </button>
-                  <span class="font-medium">シーケンス {{ index + 1 }}</span>
-                </div>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b">
+              <th class="w-6"></th>
+              <th class="w-20 py-2 font-normal text-center">反復回数</th>
+              <th class="w-16 py-2 font-normal text-center">開始時間</th>
+              <th class="w-24 py-2 font-normal text-center">刺激1</th>
+              <th class="w-16 py-2 font-normal text-center">休止</th>
+              <th class="w-24 py-2 font-normal text-center">刺激2</th>
+              <th class="w-16 py-2 font-normal text-center">制限時間</th>
+              <th class="w-24 py-2 font-normal text-center">正答ボタン</th>
+              <th class="w-20"></th>
+            </tr>
+            <tr class="text-xs text-gray-500">
+              <th></th>
+              <th class="text-center pt-1">[回]</th>
+              <th class="text-center pt-1">[秒]</th>
+              <th class="text-center pt-1">[ID]</th>
+              <th class="text-center pt-1">[秒]</th>
+              <th class="text-center pt-1">[ID]</th>
+              <th class="text-center pt-1">[秒]</th>
+              <th></th>
+              <th></th>
+            </tr>
+          </thead>
 
-                <div class="flex items-center space-x-2">
-                  <!-- 再生コントロール -->
-                  <div class="flex space-x-1">
-                    <button
-                      v-if="isPlaying && currentPlayingIndex === index"
-                      @click="pauseSequence"
-                      class="p-1 text-yellow-500 hover:text-yellow-600"
-                    >
-                      <PauseIcon class="w-5 h-5" />
-                    </button>
-                    <button
-                      v-else-if="isPaused && currentPlayingIndex === index"
-                      @click="resumeSequence"
-                      class="p-1 text-green-500 hover:text-green-600"
-                    >
-                      <PlayIcon class="w-5 h-5" />
-                    </button>
-                    <button
-                      v-else
-                      @click="playSequence(index)"
-                      class="p-1 text-blue-500 hover:text-blue-600"
-                    >
-                      <PlayIcon class="w-5 h-5" />
-                    </button>
-                    <button
-                      v-if="currentPlayingIndex === index"
-                      @click="stopSequence"
-                      class="p-1 text-red-500 hover:text-red-600"
-                    >
-                      <StopIcon class="w-5 h-5" />
-                    </button>
-                  </div>
-                  <button
-                    @click="deleteSequence(index)"
-                    class="p-1 text-red-500 hover:text-red-600"
-                  >
-                    <TrashIcon class="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              <!-- シーケンス進行状況 -->
-              <div 
-                v-if="currentPlayingIndex === index" 
-                class="mb-4 p-2 bg-gray-50 rounded"
-              >
-                <div class="flex justify-between text-sm text-gray-600 mb-1">
-                  <span>{{ currentStageText }}</span>
-                  <span>{{ remainingTime }}秒</span>
-                </div>
-                <div class="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    class="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    :style="{ width: `${progressPercentage}%` }"
-                  ></div>
-                </div>
-              </div>
-
-              <!-- シーケンス設定フォーム -->
-              <div class="space-y-4">
-                <!-- タイミング設定 -->
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                      開始待ち時間 (秒)
-                    </label>
+          <tbody>
+            <draggable
+              v-model="testSettings.sequences"
+              tag="tbody"
+              item-key="id"
+              handle=".drag-handle"
+              :animation="150"
+              ghost-class="opacity-50"
+            >
+              <template #item="{ element: sequence, index }">
+                <tr 
+                  class="border-b hover:bg-gray-50"
+                  :class="{ 'border-blue-500 border-2': currentPlayingIndex === index && isPlaying }"
+                >
+                  <td class="py-2 px-2">
+                    <div class="flex items-center">
+                      <button class="drag-handle cursor-move">
+                        <Bars3Icon class="w-4 h-4 text-gray-400" />
+                      </button>
+                      <span class="ml-1">試行{{ index + 1 }}</span>
+                    </div>
+                  </td>
+                  <td class="px-1 py-1">
+                    <input
+                      v-model.number="sequence.repeatCount"
+                      type="number"
+                      min="1"
+                      step="1"
+                      class="w-full p-1 text-sm border rounded text-center"
+                    />
+                  </td>
+                  <td class="px-1 py-1">
                     <input
                       v-model.number="sequence.waitTime"
                       type="number"
                       min="0"
                       step="0.5"
-                      class="w-full p-2 border rounded"
+                      class="w-full p-1 text-sm border rounded text-center"
                     />
-                  </div>
-                  
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                      休止時間 (秒)
-                    </label>
+                  </td>
+                  <td class="px-1 py-1">
+                    <select
+                      v-model="sequence.audio1"
+                      class="w-full p-1 text-sm border rounded text-center"
+                    >
+                      <option value="">---</option>
+                      <option 
+                        v-for="(file, idx) in audioFiles" 
+                        :key="file.id" 
+                        :value="file.id"
+                      >
+                        刺激{{ idx + 1 }}
+                      </option>
+                    </select>
+                  </td>
+                  <td class="px-1 py-1">
                     <input
                       v-model.number="sequence.pauseTime"
                       type="number"
                       min="0"
                       step="0.5"
-                      class="w-full p-2 border rounded"
+                      class="w-full p-1 text-sm border rounded text-center"
                     />
-                  </div>
-                </div>
-
-                <!-- 音源設定 -->
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                      音源1
-                    </label>
-                    <select
-                      v-model="sequence.audio1"
-                      class="w-full p-2 border rounded"
-                    >
-                      <option value="">選択してください</option>
-                      <option 
-                        v-for="file in audioFiles" 
-                        :key="file.id" 
-                        :value="file.id"
-                      >
-                        {{ file.name }}
-                      </option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                      音源2
-                    </label>
+                  </td>
+                  <td class="px-1 py-1">
                     <select
                       v-model="sequence.audio2"
-                      class="w-full p-2 border rounded"
+                      class="w-full p-1 text-sm border rounded text-center"
                     >
-                      <option value="">選択してください</option>
+                      <option value="">---</option>
                       <option 
-                        v-for="file in audioFiles" 
+                        v-for="(file, idx) in audioFiles" 
                         :key="file.id" 
                         :value="file.id"
                       >
-                        {{ file.name }}
+                        刺激{{ idx + 1 }}
                       </option>
                     </select>
-                  </div>
-                </div>
-
-                <!-- 回答時間と正解選択 -->
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                      回答時間 (秒)
-                    </label>
+                  </td>
+                  <td class="px-1 py-1">
                     <input
                       v-model.number="sequence.answerTime"
                       type="number"
                       min="1"
                       step="1"
-                      class="w-full p-2 border rounded"
+                      class="w-full p-1 text-sm border rounded text-center"
                     />
-                  </div>
-
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                      正解選択肢
-                    </label>
+                  </td>
+                  <td class="px-1 py-1">
                     <select
                       v-model="sequence.correctOption"
-                      class="w-full p-2 border rounded"
+                      class="w-full p-1 text-sm border rounded text-center"
                     >
-                      <option value="">選択してください</option>
+                      <option value="">---</option>
                       <option
                         v-for="option in testSettings.options"
                         :key="option.value"
@@ -329,63 +288,88 @@
                         {{ option.label }}
                       </option>
                     </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <!-- 空状態表示 -->
-          <template #footer>
-            <div 
-              v-if="testSettings.sequences.length === 0"
-              class="p-4 text-center text-gray-500"
-            >
-              シーケンスがありません
-            </div>
-          </template>
-        </draggable>
+                  </td>
+                  <td class="px-2 py-1">
+                    <div class="flex items-center space-x-1">
+                      <button
+                        v-if="isPlaying && currentPlayingIndex === index"
+                        @click="pauseSequence"
+                        class="p-1 text-yellow-500 hover:text-yellow-600"
+                      >
+                        <PauseIcon class="w-4 h-4" />
+                      </button>
+                      <button
+                        v-else-if="isPaused && currentPlayingIndex === index"
+                        @click="resumeSequence"
+                        class="p-1 text-green-500 hover:text-green-600"
+                      >
+                        <PlayIcon class="w-4 h-4" />
+                      </button>
+                      <button
+                        v-else
+                        @click="playSequence(index)"
+                        class="p-1 text-blue-500 hover:text-blue-600"
+                      >
+                        <PlayIcon class="w-4 h-4" />
+                      </button>
+                      <button
+                        v-if="currentPlayingIndex === index"
+                        @click="stopSequence"
+                        class="p-1 text-red-500 hover:text-red-600"
+                      >
+                        <StopIcon class="w-4 h-4" />
+                      </button>
+                      <button
+                        @click="deleteSequence(index)"
+                        class="p-1 text-red-500 hover:text-red-600"
+                      >
+                        <TrashIcon class="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </draggable>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 </template>
-
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { 
   PlayIcon, 
   PauseIcon, 
   StopIcon, 
   TrashIcon,
-  Bars3Icon
+  Bars3Icon,
+  PlusIcon
 } from '@heroicons/vue/24/solid'
 import draggable from 'vuedraggable'
 import AudioFiles from '../components/AudioFiles.vue'
 import type { AudioFile, TestSettings, TestSequence } from '../types'
 
-
-// 状态管理
+// 状態管理
 const audioFiles = ref<AudioFile[]>([])
+const currentPlayingId = ref<string | null>(null)
 const currentPlayingIndex = ref(-1)
 const isPlaying = ref(false)
 const isPaused = ref(false)
-const remainingTime = ref(0)
-const currentStage = ref<'wait' | 'audio1' | 'pause' | 'audio2' | null>(null)
 
-// 设定标签页
+// 設定タブ
 const tabs = [
-  { id: 'options', name: '回答選択肢' },
+  { id: 'buttons', name: 'ボタン' },
   { id: 'instruction', name: '教示文' },
-  { id: 'lights', name: '提示灯' }
+  { id: 'lamps', name: 'ランプ' }
 ]
-const currentTab = ref('options')
+const currentTab = ref('buttons')
 
 // 初期設定
 const testSettings = ref<TestSettings>({
   instruction: '',
   options: [
-    { value: 'A', label: 'A' },
-    { value: 'B', label: 'B' }
+    { value: 'A', label: 'A' }
   ],
   sequences: [],
   lightSettings: {
@@ -396,53 +380,11 @@ const testSettings = ref<TestSettings>({
   }
 })
 
-// タイマー管理
-let countdownInterval: NodeJS.Timer | null = null
-let sequenceTimeout: NodeJS.Timeout | null = null
-
-// 计算属性
-const currentStageText = computed(() => {
-  switch (currentStage.value) {
-    case 'wait':
-      return '開始待ち'
-    case 'audio1':
-      return '音源1再生中'
-    case 'pause':
-      return '休止中'
-    case 'audio2':
-      return '音源2再生中'
-    default:
-      return ''
-  }
-})
-
-const progressPercentage = computed(() => {
-  const sequence = testSettings.value.sequences[currentPlayingIndex.value]
-  if (!sequence || remainingTime.value === 0) return 0
-
-  let totalTime = 0
-  switch (currentStage.value) {
-    case 'wait':
-      totalTime = sequence.waitTime
-      break
-    case 'pause':
-      totalTime = sequence.pauseTime
-      break
-    case 'audio1':
-    case 'audio2':
-      totalTime = 0 // 音声再生時は不明
-      break
-    default:
-      return 0
-  }
-
-  return totalTime > 0 ? (remainingTime.value / totalTime) * 100 : 0
-})
-
 // シーケンス管理
 const createNewSequence = (): TestSequence => {
   return {
-    id: Date.now().toString(), // draggableのために必要
+    id: Date.now().toString(),
+    repeatCount: 1,
     waitTime: 2,
     pauseTime: 1,
     answerTime: 5,
@@ -457,7 +399,7 @@ const addSequence = () => {
 }
 
 const deleteSequence = (index: number) => {
-  if (confirm('このシーケンスを削除しますか？')) {
+  if (confirm('この試行を削除しますか？')) {
     if (currentPlayingIndex.value === index) {
       stopSequence()
     }
@@ -465,10 +407,10 @@ const deleteSequence = (index: number) => {
   }
 }
 
-// 選択肢管理
-const addOption = () => {
-  const lastOption = testSettings.value.options[testSettings.value.options.length - 1]
-  const nextValue = String.fromCharCode(lastOption.label.charCodeAt(0) + 1)
+// ボタン管理
+const addButton = () => {
+  const lastButton = testSettings.value.options[testSettings.value.options.length - 1]
+  const nextValue = String.fromCharCode(lastButton.label.charCodeAt(0) + 1)
   
   testSettings.value.options.push({
     value: nextValue,
@@ -476,25 +418,30 @@ const addOption = () => {
   })
 }
 
-const deleteOption = (index: number) => {
-  if (testSettings.value.options.length <= 2) {
-    alert('最低2つの選択肢が必要です')
+const deleteButton = (index: number) => {
+  if (testSettings.value.options.length <= 1) {
+    alert('最低1つのボタンが必要です')
     return
   }
   
-  const optionToDelete = testSettings.value.options[index]
+  const buttonToDelete = testSettings.value.options[index]
   testSettings.value.options.splice(index, 1)
   
-  // 削除した選択肢が正解だった場合、正解を更新
+  // 削除したボタンが正解だった場合、正解を更新
   testSettings.value.sequences.forEach(sequence => {
-    if (sequence.correctOption === optionToDelete.value) {
-      sequence.correctOption = testSettings.value.options[0].value
+    if (sequence.correctOption === buttonToDelete.value) {
+      sequence.correctOption = ''
     }
   })
 }
 
 // シーケンス再生制御
 const playSequence = async (index: number) => {
+  // 先に古い再生を停止
+  if (currentPlayingIndex.value !== -1) {
+    await stopSequence()
+  }
+
   currentPlayingIndex.value = index
   isPlaying.value = true
   isPaused.value = false
@@ -502,32 +449,25 @@ const playSequence = async (index: number) => {
   const sequence = testSettings.value.sequences[index]
   
   try {
-    // 開始待ち時間
-    currentStage.value = 'wait'
-    remainingTime.value = sequence.waitTime
-    await startTimer(sequence.waitTime * 1000)
-
+    // 待ち時間
+    await new Promise(resolve => setTimeout(resolve, sequence.waitTime * 1000))
     if (!isPlaying.value) return
 
-    // 音源1の再生
-    currentStage.value = 'audio1'
+    // 音源1
     await window.electronAPI.playAudio(sequence.audio1)
-
     if (!isPlaying.value) return
 
     // 休止時間
-    currentStage.value = 'pause'
-    remainingTime.value = sequence.pauseTime
-    await startTimer(sequence.pauseTime * 1000)
-
+    await new Promise(resolve => setTimeout(resolve, sequence.pauseTime * 1000))
     if (!isPlaying.value) return
 
-    // 音源2の再生
-    currentStage.value = 'audio2'
+    // 音源2
     await window.electronAPI.playAudio(sequence.audio2)
 
-    // 再生完了
-    stopSequence()
+    // 再生完了時
+    setTimeout(() => {
+      stopSequence()
+    }, 1000)  // 音源2の再生が終わってから1秒後に停止
   } catch (error) {
     console.error('Error playing sequence:', error)
     stopSequence()
@@ -537,7 +477,6 @@ const playSequence = async (index: number) => {
 const pauseSequence = async () => {
   isPlaying.value = false
   isPaused.value = true
-  clearTimeouts()
   await window.electronAPI.pauseAudio()
 }
 
@@ -545,73 +484,51 @@ const resumeSequence = async () => {
   isPlaying.value = true
   isPaused.value = false
   await window.electronAPI.resumeAudio()
-  continueSequence()
+  await playSequence(currentPlayingIndex.value)
 }
 
-const stopSequence = () => {
+const stopSequence = async () => {
   isPlaying.value = false
   isPaused.value = false
   currentPlayingIndex.value = -1
-  currentStage.value = null
-  remainingTime.value = 0
-  clearTimeouts()
-  window.electronAPI.stopAudio()
-}
-
-const continueSequence = () => {
-  const sequence = testSettings.value.sequences[currentPlayingIndex.value]
-  if (!sequence) return
-
-  switch (currentStage.value) {
-    case 'wait':
-      playSequence(currentPlayingIndex.value)
-      break
-    case 'pause':
-      startTimer(remainingTime.value * 1000)
-      break
-    // audio1とaudio2は音声再生中なので制御不要
-  }
-}
-
-// タイマー制御
-const startTimer = (duration: number) => {
-  return new Promise<void>((resolve) => {
-    if (countdownInterval) clearInterval(countdownInterval)
-    
-    const startTime = Date.now()
-    const endTime = startTime + duration
-    
-    countdownInterval = setInterval(() => {
-      if (!isPlaying.value) return
-
-      const now = Date.now()
-      const remaining = Math.max(0, endTime - now)
-      
-      remainingTime.value = Math.ceil(remaining / 1000)
-      
-      if (remaining <= 0) {
-        if (countdownInterval) clearInterval(countdownInterval)
-        resolve()
-      }
-    }, 100)
-  })
-}
-
-const clearTimeouts = () => {
-  if (countdownInterval) {
-    clearInterval(countdownInterval)
-    countdownInterval = null
-  }
-  if (sequenceTimeout) {
-    clearTimeout(sequenceTimeout)
-    sequenceTimeout = null
-  }
+  await window.electronAPI.stopAudio()
 }
 
 // ファイル操作
+const handleAudioFilesUpdate = (files: AudioFile[]) => {
+  audioFiles.value = files
+}
+
+// 保存と読み込み
 const saveSettings = async () => {
   try {
-    await window.electronAPI.saveTestSettingsToFile()
+    // クローン可能なデータだけを保存
+    const settingsToSave = {
+      instruction: testSettings.value.instruction,
+      options: testSettings.value.options.map(opt => ({
+        value: opt.value,
+        label: opt.label
+      })),
+      sequences: testSettings.value.sequences.map(seq => ({
+        id: seq.id,
+        repeatCount: seq.repeatCount,
+        waitTime: seq.waitTime,
+        audio1: seq.audio1,
+        pauseTime: seq.pauseTime,
+        audio2: seq.audio2,
+        answerTime: seq.answerTime,
+        correctOption: seq.correctOption
+      })),
+      lightSettings: { ...testSettings.value.lightSettings },
+      audioFiles: audioFiles.value.map(file => ({
+        id: file.id,
+        path: file.originalPath,
+        name: file.name,
+        comment: file.comment
+      }))
+    }
+    
+    await window.electronAPI.saveTestSettingsToFile(settingsToSave)
   } catch (error) {
     console.error('Error saving settings:', error)
     alert('設定の保存に失敗しました')
@@ -623,7 +540,9 @@ const loadSettings = async () => {
     const settings = await window.electronAPI.loadTestSettingsFromFile()
     if (settings) {
       testSettings.value = settings
-      await loadAudioFiles()
+      if (settings.audioFiles) {
+        audioFiles.value = settings.audioFiles
+      }
     }
   } catch (error) {
     console.error('Error loading settings:', error)
@@ -636,35 +555,43 @@ const startTest = async () => {
   try {
     // バリデーション
     if (testSettings.value.sequences.length === 0) {
-      alert('少なくとも1つのシーケンスを追加してください')
+      alert('少なくとも1つの試行を追加してください')
       return
     }
 
     for (let i = 0; i < testSettings.value.sequences.length; i++) {
       const seq = testSettings.value.sequences[i]
       if (!seq.audio1 || !seq.audio2) {
-        alert(`シーケンス${i + 1}の音源が選択されていません`)
+        alert(`試行${i + 1}の刺激が選択されていません`)
         return
       }
       if (!seq.correctOption) {
-        alert(`シーケンス${i + 1}の正解が選択されていません`)
+        alert(`試行${i + 1}の正答ボタンが選択されていません`)
         return
       }
     }
 
-    await window.electronAPI.createTestWindow(testSettings.value)
+    // テストデータを作成（循環参照を避ける）
+    const testData = {
+      instruction: testSettings.value.instruction,
+      options: JSON.parse(JSON.stringify(testSettings.value.options)),
+      sequences: JSON.parse(JSON.stringify(testSettings.value.sequences)),
+      lightSettings: { ...testSettings.value.lightSettings },
+      audioFiles: audioFiles.value.map(file => ({
+        id: file.id,
+        path: file.originalPath,
+        name: file.name,
+        comment: file.comment
+      }))
+    }
+
+    await window.electronAPI.createTestWindow(testData)
   } catch (error) {
     console.error('Error starting test:', error)
     alert('テストの開始に失敗しました')
   }
 }
 
-// 音声ファイル管理
-const handleAudioFilesUpdate = (files: AudioFile[]) => {
-  audioFiles.value = files
-}
-
-// 初期化とクリーンアップ
 onMounted(async () => {
   try {
     await loadAudioFiles()
@@ -686,6 +613,8 @@ const loadAudioFiles = async () => {
 }
 
 onUnmounted(() => {
-  clearTimeouts()
+  if (currentPlayingIndex.value !== -1) {
+    stopSequence()
+  }
 })
 </script>
