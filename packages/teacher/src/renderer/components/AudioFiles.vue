@@ -20,12 +20,16 @@
       >
         <div class="flex items-center space-x-3">
           <!-- 再生コントロール -->
-          <button
-            v-if="isPlaying(file.id)"
-            class="flex space-x-1"
-          >
+          <div class="flex space-x-1">
             <button
-              v-if="isPaused(file.id)"
+              v-if="isPlaying(file.id) && !isPaused(file.id)"
+              @click="pauseAudio"
+              class="p-1 text-blue-500 hover:text-blue-600"
+            >
+              <PauseIcon class="w-5 h-5" />
+            </button>
+            <button
+              v-else-if="isPaused(file.id)"
               @click="resumeAudio"
               class="p-1 text-blue-500 hover:text-blue-600"
             >
@@ -33,25 +37,19 @@
             </button>
             <button
               v-else
-              @click="pauseAudio"
+              @click="playAudio(file.id)"
               class="p-1 text-blue-500 hover:text-blue-600"
             >
-              <PauseIcon class="w-5 h-5" />
+              <PlayIcon class="w-5 h-5" />
             </button>
             <button
+              v-if="isPlaying(file.id)"
               @click="stopAudio"
               class="p-1 text-red-500 hover:text-red-600"
             >
               <StopIcon class="w-5 h-5" />
             </button>
-          </button>
-          <button
-            v-else
-            @click="playAudio(file.id)"
-            class="p-1 text-blue-500 hover:text-blue-600"
-          >
-            <PlayIcon class="w-5 h-5" />
-          </button>
+          </div>
           <span class="text-sm">{{ file.name }}</span>
         </div>
 
@@ -99,7 +97,7 @@ onUnmounted(() => {
 
 const setupAudioControls = () => {
   // Listen for audio control events from the main process
-  window.electronAPI.onAudioControl((event: any) => {
+  const cleanup = window.electronAPI.onAudioControl((event: any) => {
     switch (event.type) {
       case 'play':
         playLocalAudio(event.path, event.id)
@@ -114,6 +112,10 @@ const setupAudioControls = () => {
         stopLocalAudio()
         break
     }
+  })
+
+  onUnmounted(() => {
+    cleanup()
   })
 }
 
@@ -157,9 +159,14 @@ const stopLocalAudio = () => {
   }
 }
 
+const emit = defineEmits<{
+  (e: 'filesUpdated', files: AudioFile[]): void
+}>()
+
 const loadAudioFiles = async () => {
   try {
     audioFiles.value = await window.electronAPI.getAudioFiles()
+    emit('filesUpdated', audioFiles.value)
   } catch (error) {
     console.error('Failed to load audio files:', error)
   }
@@ -179,6 +186,9 @@ const importAudioFiles = async () => {
 const deleteFile = async (fileId: string) => {
   try {
     if (confirm('本当に削除しますか？')) {
+      if (currentPlayingId.value === fileId) {
+        await stopAudio()
+      }
       await window.electronAPI.deleteAudioFile(fileId)
       await loadAudioFiles()
     }

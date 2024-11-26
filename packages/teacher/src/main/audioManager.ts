@@ -2,7 +2,7 @@ import { join } from 'path'
 import { promises as fs } from 'fs'
 import { app, dialog, BrowserWindow } from 'electron'
 import { v4 as uuidv4 } from 'uuid'
-import type { AudioFile } from '../types'
+import type { AudioFile } from '../renderer/types'
 
 export class AudioManager {
   private audioDir: string
@@ -23,7 +23,7 @@ export class AudioManager {
           const id = file.split('_')[0]
           this.files.set(id, {
             id,
-            path: filePath,
+            path: `audio-file://${filePath}`,
             name: file.split('_')[1] || file,
             originalPath: filePath
           })
@@ -50,12 +50,12 @@ export class AudioManager {
         const originalName = filePath.split(/[\\/]/).pop() || ''
         const newName = `${id}_${originalName}`
         const newPath = join(this.audioDir, newName)
-
+        
         try {
           await fs.copyFile(filePath, newPath)
           const audioFile = {
             id,
-            path: newPath,
+            path: `audio-file://${newPath}`,
             name: originalName,
             originalPath: filePath
           }
@@ -76,7 +76,7 @@ export class AudioManager {
     if (!file) return false
 
     try {
-      await fs.unlink(file.path)
+      await fs.unlink(file.originalPath)
       this.files.delete(fileId)
       return true
     } catch (error) {

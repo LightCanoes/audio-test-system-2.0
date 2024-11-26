@@ -49,9 +49,11 @@ export class TestManager extends EventEmitter {
 
   constructor() {
     super()
+    // 在构造函数中自动启动服务器
+    this.startServer()
   }
 
-  startServer() {
+  private startServer() {
     if (this.wss) return
 
     this.wss = new WebSocketServer({ port: 8080 })
@@ -61,7 +63,6 @@ export class TestManager extends EventEmitter {
       const isTeacher = request.url?.includes('teacher')
 
       if (!isTeacher) {
-        // 初始化学生数据
         this.students.set(clientId, {
           id: clientId,
           answers: [],
@@ -69,13 +70,14 @@ export class TestManager extends EventEmitter {
           totalAnswered: 0,
           correctRate: 0
         })
+      }
 
         // 通知教师新学生连接
         this.broadcastToTeachers({
           type: 'student-connected',
           student: this.students.get(clientId)
         })
-      }
+
 
       // 发送初始状态
       this.sendToClient(ws, {

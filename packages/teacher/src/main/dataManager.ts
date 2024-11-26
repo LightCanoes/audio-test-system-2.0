@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { join } from 'path'
 import { promises as fs } from 'fs'
 import type { TestSettings } from '../renderer/types'
+import { dialog } from 'electron'
 
 export class DataManager {
   private dataDir: string
@@ -43,5 +44,39 @@ export class DataManager {
       console.error('Failed to load test data:', error)
       throw error
     }
+  }
+  async saveTestSettingsToFile() {
+    const result = await dialog.showSaveDialog({
+      filters: [{ name: 'Test Settings', extensions: ['json'] }]
+    })
+
+    if (!result.canceled && result.filePath) {
+      try {
+        const data = await this.loadTestData()
+        await fs.writeFile(result.filePath, JSON.stringify(data, null, 2))
+      } catch (error) {
+        console.error('Failed to save test settings:', error)
+        throw error
+      }
+    }
+  }
+
+  async loadTestSettingsFromFile() {
+    const result = await dialog.showOpenDialog({
+      filters: [{ name: 'Test Settings', extensions: ['json'] }]
+    })
+
+    if (!result.canceled && result.filePaths.length > 0) {
+      try {
+        const data = await fs.readFile(result.filePaths[0], 'utf-8')
+        const settings = JSON.parse(data)
+        await this.saveTestData(settings)
+        return settings
+      } catch (error) {
+        console.error('Failed to load test settings:', error)
+        throw error
+      }
+    }
+    return null
   }
 }

@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
 
+  // 测试设置文件操作
+  saveTestSettingsToFile: () => ipcRenderer.invoke('save-test-settings-to-file'),
+  loadTestSettingsFromFile: () => ipcRenderer.invoke('load-test-settings-from-file'),
+
   // 测试数据管理
   saveTestData: (data: TestSettings) => ipcRenderer.invoke('save-test-data', data),
   loadTestData: () => ipcRenderer.invoke('load-test-data'),
@@ -41,6 +45,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pauseTest: () => ipcRenderer.invoke('pause-test'),
   resumeTest: () => ipcRenderer.invoke('resume-test'),
   stopTest: () => ipcRenderer.invoke('stop-test'),
+  nextQuestion: () => ipcRenderer.invoke('next-question'),
+  
+  // 网络相关
+  getNetworkAddresses: () => ipcRenderer.invoke('get-network-addresses'),
   
   // 事件监听
   onTestStateUpdate: (callback: (state: any) => void) => {
@@ -62,32 +70,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
 declare global {
   interface Window {
     electronAPI: {
-      // 音频文件管理
       getAudioFiles: () => Promise<AudioFile[]>
       importAudioFiles: () => Promise<AudioFile[]>
       deleteAudioFile: (fileId: string) => Promise<boolean>
       
-      // 音频播放控制
       playAudio: (fileId: string) => Promise<boolean>
       pauseAudio: () => Promise<boolean>
       resumeAudio: () => Promise<boolean>
       stopAudio: () => Promise<boolean>
       onAudioControl: (callback: (event: AudioControlEvent) => void) => () => void
       
-      // 测试数据管理
+      saveTestSettingsToFile: () => Promise<void>
+      loadTestSettingsFromFile: () => Promise<TestSettings | null>
+      
       saveTestData: (data: TestSettings) => Promise<void>
       loadTestData: () => Promise<TestSettings>
       
-      // 测试窗口管理
       createTestWindow: (testData: TestSettings) => Promise<void>
       
-      // 测试控制
       startTest: (testData: TestSettings) => Promise<void>
       pauseTest: () => Promise<void>
       resumeTest: () => Promise<void>
       stopTest: () => Promise<void>
+      nextQuestion: () => Promise<void>
       
-      // 事件监听
+      getNetworkAddresses: () => Promise<string[]>
+      
       onTestStateUpdate: (callback: (state: any) => void) => () => void
       onInitTestData: (callback: (data: TestSettings) => void) => () => void
     }

@@ -15,21 +15,18 @@
         </div>
       </div>
 
+      <div class="text-sm text-gray-600">
+        接続URL: ws://{{ serverAddress }}:8080
+      </div>
+
       <div class="flex space-x-4">
         <button
-          @click="openStudentWindow"
-          class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+          v-if="!isStarted"
+          @click="startTest"
+          class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
         >
-          学生画面を開く
+          テスト開始
         </button>
-        <template v-if="!isStarted">
-          <button
-            @click="startTest"
-            class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
-          >
-            テスト開始
-          </button>
-        </template>
         <template v-else>
           <button
             v-if="isPlaying"
@@ -214,7 +211,7 @@
         </div>
 
         <!-- 全体統計 -->
-        <div>
+        <div v-if="questionStats.length > 0">
           <h3 class="text-sm font-medium text-gray-600 mb-2">全体</h3>
           <div class="space-y-4">
             <div class="p-3 bg-gray-50 rounded-lg">
@@ -259,11 +256,11 @@
     />
   </div>
 </template>
-
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import TestResultDialog from '../components/TestResultDialog.vue'
 import type { TestSettings, TestSequence } from '../types'
+import { getServerAddress } from '../utils/network'
 
 // 状態管理
 const isStarted = ref(false)
@@ -274,6 +271,9 @@ const currentQuestionIndex = ref(-1)
 const remainingTime = ref(0)
 const showingAnswer = ref(false)
 const showResults = ref(false)
+
+// サーバーアドレス
+const serverAddress = ref('')
 
 // テストデータ
 const testData = ref<TestSettings | null>(null)
@@ -291,7 +291,7 @@ const questionStats = ref<any[]>([])
 const testStats = ref<any>(null)
 
 // タイマー管理
-let countdownInterval: NodeJS.Timeout | null = null
+let countdownInterval: NodeJS.Timer | null = null
 let sequenceTimeout: NodeJS.Timeout | null = null
 
 // 計算プロパティ
@@ -309,6 +309,7 @@ const progressPercentage = computed(() => {
 })
 
 const overallStats = computed(() => {
+  if (questionStats.value.length === 0) return { correctRate: 0 }
   const totalCorrect = questionStats.value.reduce((sum, q) => sum + q.correctAnswers, 0)
   const totalAnswers = questionStats.value.reduce((sum, q) => sum + q.totalAnswers, 0)
   return {
@@ -372,7 +373,6 @@ const stopTest = async () => {
   }
 }
 
-
 const startQuestionSequence = async () => {
   if (!currentSequence.value || !isPlaying.value) return
 
@@ -424,6 +424,8 @@ const startTimer = (duration: number) => {
     const endTime = startTime + duration
     
     countdownInterval = setInterval(() => {
+      if (!isPlaying.value) return
+
       const now = Date.now()
       const remaining = Math.max(0, endTime - now)
       
@@ -472,14 +474,6 @@ const resumeAudio = async () => {
   }
 }
 
-const openStudentWindow = async () => {
-  try {
-    await window.electronAPI.createStudentWindow()
-  } catch (error) {
-    console.error('Failed to open student window:', error)
-  }
-}
-
 const getStudentStatusClass = (student: any) => {
   if (!student.currentAnswer) return 'bg-gray-50'
   if (showingAnswer.value) {
@@ -505,7 +499,11 @@ const closeResults = () => {
 }
 
 // 初期化とクリーンアップ
-onMounted(() => {
+onMounted(async () => {
+  // サーバーアドレスを取得
+  serverAddress.value = await getServerAddress()
+
+  // テストデータの初期化
   window.electronAPI.onInitTestData((data) => {
     testData.value = data
     totalQuestions.value = data.sequences.length

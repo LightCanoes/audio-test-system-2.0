@@ -1,128 +1,125 @@
 <template>
-    <div class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
-        <!-- 学生信息和连接状态 -->
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <div 
-              class="w-3 h-3 rounded-full"
-              :class="{
-                'bg-green-500': connectionStatus === 'connected',
-                'bg-yellow-500': connectionStatus === 'connecting',
-                'bg-red-500': connectionStatus === 'disconnected'
-              }"
-            ></div>
-            <span class="text-sm font-medium">{{ connectionStatusText }}</span>
-          </div>
-          <div v-if="studentId" class="text-sm text-gray-500">
-            ID: {{ studentId }}
-          </div>
+  <div class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
+      <!-- 连接状态 -->
+      <div class="flex justify-between items-center mb-6">
+        <div class="flex items-center space-x-2">
+          <div 
+            class="w-3 h-3 rounded-full"
+            :class="{
+              'bg-green-500': connectionStatus === 'connected',
+              'bg-yellow-500': connectionStatus === 'connecting',
+              'bg-red-500': connectionStatus === 'disconnected'
+            }"
+          ></div>
+          <span class="text-sm font-medium">{{ connectionStatusText }}</span>
         </div>
-  
-        <!-- 音源再生インジケーター -->
-        <div v-if="testState === 'started'" class="mt-4 flex justify-center space-x-8">
+        <div v-if="studentId" class="text-sm text-gray-500">
+          ID: {{ studentId }}
+        </div>
+      </div>
+
+      <!-- 等待区域 -->
+      <div v-if="!testStarted" class="py-8 text-center text-gray-600">
+        テストの開始をお待ちください
+      </div>
+
+      <template v-else>
+        <!-- 播放指示灯 -->
+        <div v-if="showPlayingIndicator" class="flex justify-center space-x-8 mb-6">
           <div class="text-center">
             <div
-              class="w-4 h-4 rounded-full mb-1 mx-auto"
-              :class="{ 'bg-blue-500': currentAudio === 1, 'bg-gray-300': currentAudio !== 1 }"
-              v-show="showPlayingIndicator"
+              class="w-4 h-4 rounded-full mb-1 mx-auto transition-colors duration-300"
+              :class="{ 'bg-blue-500': playingStage === 'audio1', 'bg-gray-300': playingStage !== 'audio1' }"
             ></div>
             <span class="text-xs text-gray-600">音源1</span>
           </div>
           <div class="text-center">
             <div
-              class="w-4 h-4 rounded-full mb-1 mx-auto"
-              :class="{ 'bg-blue-500': currentAudio === 2, 'bg-gray-300': currentAudio !== 2 }"
-              v-show="showPlayingIndicator"
+              class="w-4 h-4 rounded-full mb-1 mx-auto transition-colors duration-300"
+              :class="{ 'bg-blue-500': playingStage === 'audio2', 'bg-gray-300': playingStage !== 'audio2' }"
             ></div>
             <span class="text-xs text-gray-600">音源2</span>
           </div>
         </div>
-  
-        <!-- 回答提示灯 -->
-        <div v-if="testState === 'started'" class="mt-4 flex justify-center space-x-4">
-          <div v-if="showCorrectLight" class="text-center">
-            <div
-              class="w-4 h-4 rounded-full mb-1 mx-auto"
-              :class="{ 'bg-green-500': answerResult === 'correct' }"
-            ></div>
-            <span class="text-xs text-gray-600">正解</span>
+
+        <!-- 进度显示 -->
+        <div class="mb-6">
+          <div class="flex justify-between text-sm text-gray-600 mb-2">
+            <span>問題 {{ currentQuestionIndex + 1 }} / {{ totalQuestions }}</span>
+            <span v-if="remainingTime > 0">残り {{ remainingTime }} 秒</span>
           </div>
-          <div v-if="showWrongLight" class="text-center">
+          <div class="w-full bg-gray-200 rounded-full h-2">
             <div
-              class="w-4 h-4 rounded-full mb-1 mx-auto"
-              :class="{ 'bg-red-500': answerResult === 'wrong' }"
+              class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              :style="{ width: `${(currentQuestionIndex + 1) / totalQuestions * 100}%` }"
             ></div>
-            <span class="text-xs text-gray-600">不正解</span>
-          </div>
-          <div v-if="showAlmostLight" class="text-center">
-            <div
-              class="w-4 h-4 rounded-full mb-1 mx-auto"
-              :class="{ 'bg-yellow-500': answerResult === 'almost' }"
-            ></div>
-            <span class="text-xs text-gray-600">おしい</span>
           </div>
         </div>
-  
-        <!-- テスト進行中 -->
-        <div v-if="testState === 'started'" class="mt-6 space-y-6">
-          <!-- プログレスバー -->
-          <div class="space-y-2">
-            <div class="flex justify-between text-sm text-gray-600">
-              <span>設問</span>
-              <span>{{ currentQuestionIndex + 1 }} / {{ totalQuestions }}</span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                class="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                :style="{ width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }"
-              ></div>
-            </div>
+
+        <!-- 答题区域 -->
+        <div v-if="canAnswer && !hasAnswered" class="space-y-4">
+          <div class="text-center mb-4">
+            <h3 class="text-lg font-medium">答えを選んでください</h3>
+            <p class="text-sm text-gray-500 mt-1">一度選択すると変更できません</p>
           </div>
-  
-          <!-- 解答パネル -->
-          <div v-if="!hasAnswered && canAnswer" class="space-y-4">
-            <div class="text-center">
-              <h3 class="text-lg font-medium">答えを選んでください</h3>
-              <p class="text-sm text-gray-500 mt-1">一度選択すると変更できません</p>
-            </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <button
+              v-for="option in currentOptions"
+              :key="option.value"
+              @click="submitAnswer(option.value)"
+              class="p-4 text-center rounded-lg border-2 transition-colors hover:border-blue-500 hover:bg-blue-50"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 回答后状态 -->
+        <div v-else class="text-center py-8">
+          <div v-if="hasAnswered" class="space-y-4">
+            <p class="text-gray-600">回答を送信しました</p>
             
-            <div class="grid grid-cols-2 gap-4">
-              <button
-                v-for="option in currentOptions"
-                :key="option.value"
-                @click="submitAnswer(option.value)"
-                class="p-4 text-center rounded-lg border-2 transition-colors hover:border-blue-500 hover:bg-blue-50"
-                :class="{
-                  'border-green-500': showCorrectAnswer && option.value === correctOption,
-                  'border-gray-200': !showCorrectAnswer || option.value !== correctOption
-                }"
-              >
-                {{ option.label }}
-              </button>
+            <!-- 回答结果指示灯 -->
+            <div class="flex justify-center space-x-6">
+              <div v-if="showCorrectLight" class="text-center">
+                <div
+                  class="w-4 h-4 rounded-full mb-1 mx-auto"
+                  :class="{ 'bg-green-500': answerResult === 'correct' }"
+                ></div>
+                <span class="text-xs text-gray-600">正解</span>
+              </div>
+              <div v-if="showWrongLight" class="text-center">
+                <div
+                  class="w-4 h-4 rounded-full mb-1 mx-auto"
+                  :class="{ 'bg-red-500': answerResult === 'wrong' }"
+                ></div>
+                <span class="text-xs text-gray-600">不正解</span>
+              </div>
+              <div v-if="showAlmostLight" class="text-center">
+                <div
+                  class="w-4 h-4 rounded-full mb-1 mx-auto"
+                  :class="{ 'bg-yellow-500': answerResult === 'almost' }"
+                ></div>
+                <span class="text-xs text-gray-600">おしい</span>
+              </div>
+            </div>
+
+            <!-- 显示正确答案 -->
+            <div v-if="showingAnswer" class="mt-4">
+              <p class="text-sm text-gray-600 mb-2">正解:</p>
+              <p class="text-lg font-medium text-green-600">
+                {{ getOptionLabel(correctOption) }}
+              </p>
             </div>
           </div>
-  
-          <div v-else-if="hasAnswered" class="text-center py-8 text-gray-600">
-            回答を送信しました
-            <div v-if="showCorrectAnswer" class="mt-2 text-sm">
-              正解: {{ getOptionLabel(correctOption) }}
-            </div>
-          </div>
-  
-          <div v-else class="text-center py-8 text-gray-600">
-            回答待機中...
+          <div v-else class="text-gray-600">
+            次の問題をお待ちください
           </div>
         </div>
-  
-        <!-- テスト待機中 -->
-        <div v-else class="mt-6">
-          <div class="text-center py-8 text-gray-600">
-            {{ testState === 'ended' ? 'テストは終了しました' : 'テストを開始するまでお待ちください' }}
-          </div>
-        </div>
-  
-        <!-- 教示文ボタン -->
+
+        <!-- 教示文按钮 -->
         <div v-if="instruction" class="mt-6 flex justify-center">
           <button
             @click="showInstruction = true"
@@ -131,151 +128,152 @@
             説明を表示
           </button>
         </div>
-      </div>
-  
-      <!-- 教示文ダイアログ -->
-      <div
-        v-if="showInstruction"
-        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
-        @click.self="showInstruction = false"
-      >
-        <div class="bg-white rounded-lg max-w-lg w-full p-6">
-          <div class="prose max-w-none">
-            {{ instruction }}
-          </div>
-          <div class="mt-6 flex justify-end">
-            <button
-              @click="showInstruction = false"
-              class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-            >
-              閉じる
-            </button>
-          </div>
+      </template>
+    </div>
+
+    <!-- 教示文对话框 -->
+    <div
+      v-if="showInstruction"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+      @click.self="showInstruction = false"
+    >
+      <div class="bg-white rounded-lg max-w-lg w-full p-6">
+        <div class="prose max-w-none">
+          {{ instruction }}
+        </div>
+        <div class="mt-6 flex justify-end">
+          <button
+            @click="showInstruction = false"
+            class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+          >
+            閉じる
+          </button>
         </div>
       </div>
     </div>
-  </template>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { WebSocketClient } from '../utils/websocket'
+import type { TestOption } from '../types'
+
+// 状态管理
+const connectionStatus = ref<'connecting' | 'connected' | 'disconnected'>('connecting')
+const studentId = ref('')
+const testStarted = ref(false)
+const playingStage = ref<'wait' | 'audio1' | 'pause' | 'audio2' | 'answer' | null>(null)
+const currentQuestionIndex = ref(0)
+const totalQuestions = ref(0)
+const remainingTime = ref(0)
+const canAnswer = ref(false)
+const hasAnswered = ref(false)
+const answerResult = ref<'correct' | 'wrong' | 'almost' | null>(null)
+const showingAnswer = ref(false)
+const correctOption = ref('')
+const showInstruction = ref(false)
+
+// 配置
+const currentOptions = ref<TestOption[]>([])
+const instruction = ref('')
+const showPlayingIndicator = ref(true)
+const showCorrectLight = ref(true)
+const showWrongLight = ref(true)
+const showAlmostLight = ref(true)
+
+const connectionStatusText = computed(() => {
+  switch (connectionStatus.value) {
+    case 'connected':
+      return '接続済み'
+    case 'connecting':
+      return '接続中...'
+    case 'disconnected':
+      return '接続が切断されました'
+  }
+})
+
+// WebSocket 连接
+const connectToServer = () => {
+  const ws = new WebSocketClient('ws://localhost:8080')
   
-  <script setup lang="ts">
-  import { ref, computed, onMounted, onUnmounted } from 'vue'
-  import { WebSocketClient } from '../utils/websocket'
-  import type { TestOption, TestSettings } from '../types'
-  
-  // 状態管理
-  const connectionStatus = ref<'connecting' | 'connected' | 'disconnected'>('connecting')
-  const studentId = ref('')
-  const testState = ref<'waiting' | 'started' | 'ended'>('waiting')
-  const currentQuestionIndex = ref(0)
-  const totalQuestions = ref(0)
-  const currentAudio = ref(0)  // 0: none, 1: first, 2: second
-  const hasAnswered = ref(false)
-  const canAnswer = ref(false)
-  const showCorrectAnswer = ref(false)
-  const correctOption = ref('')
-  const answerResult = ref<'correct' | 'wrong' | 'almost' | null>(null)
-  const showInstruction = ref(false)
-  
-  // テスト設定
-  const currentOptions = ref<Array<{ value: string, label: string }>>([])
-  const instruction = ref('')
-  const showPlayingIndicator = ref(true)
-  const showCorrectLight = ref(true)
-  const showWrongLight = ref(true)
-  const showAlmostLight = ref(true)
-  
-  let ws: WebSocketClient | null = null
-  
-  const connectionStatusText = computed(() => {
-    switch (connectionStatus.value) {
-      case 'connected':
-        return '接続済み'
-      case 'connecting':
-        return '接続中...'
-      case 'disconnected':
-        return '接続が切断されました'
+  ws.on('connection-status', (status) => {
+    connectionStatus.value = status
+  })
+
+  ws.on('test-start', (data) => {
+    testStarted.value = true
+    currentQuestionIndex.value = data.currentQuestionIndex
+    totalQuestions.value = data.totalQuestions
+    currentOptions.value = data.options
+    instruction.value = data.instruction
+    showPlayingIndicator.value = data.lightSettings.showPlayingIndicator
+    showCorrectLight.value = data.lightSettings.showCorrectLight
+    showWrongLight.value = data.lightSettings.showWrongLight
+    showAlmostLight.value = data.lightSettings.showAlmostLight
+    resetQuestionState()
+  })
+
+  ws.on('playing-stage', (data) => {
+    playingStage.value = data.stage
+    remainingTime.value = data.remainingTime
+  })
+
+  ws.on('can-answer', () => {
+    canAnswer.value = true
+  })
+
+  ws.on('answer-result', (data) => {
+    answerResult.value = data.result
+    if (data.showAnswer) {
+      showingAnswer.value = true
+      correctOption.value = data.correctOption
     }
   })
-  
-  const getOptionLabel = (value: string) => {
-    return currentOptions.value.find(opt => opt.value === value)?.label || value
-  }
-  
-  // WebSocket 接続の設定
-  onMounted(() => {
-    ws = new WebSocketClient('ws://localhost:8080')
-    
-    ws.on('connected', (message) => {
-      studentId.value = message.id
-      connectionStatus.value = 'connected'
-    })
-  
-    ws.on('test-start', (message) => {
-      testState.value = 'started'
-      currentQuestionIndex.value = message.currentQuestionIndex
-      totalQuestions.value = message.totalQuestions
-      currentOptions.value = message.options
-      instruction.value = message.instruction
-      showPlayingIndicator.value = message.lightSettings.showPlayingIndicator
-      showCorrectLight.value = message.lightSettings.showCorrectLight
-      showWrongLight.value = message.lightSettings.showWrongLight
-      showAlmostLight.value = message.lightSettings.showAlmostLight
-      resetQuestionState()
-    })
-  
-    ws.on('audio-state', (message) => {
-      currentAudio.value = message.audioIndex
-    })
-  
-    ws.on('can-answer', (message) => {
-      canAnswer.value = true
-    })
-  
-    ws.on('question-end', (message) => {
-      correctOption.value = message.correctOption
-      showCorrectAnswer.value = true
-    })
-  
-    ws.on('next-question', (message) => {
-      currentQuestionIndex.value = message.questionIndex
-      resetQuestionState()
-    })
-  
-    ws.on('test-end', () => {
-      testState.value = 'ended'
-      resetQuestionState()
-    })
-  
-    ws.on('answer-result', (message) => {
-      answerResult.value = message.result
-    })
-  
-    ws.connect()
+
+  ws.on('next-question', (data) => {
+    currentQuestionIndex.value = data.questionIndex
+    currentOptions.value = data.options
+    resetQuestionState()
   })
-  
-  onUnmounted(() => {
-    ws?.close()
+
+  ws.on('test-end', () => {
+    testStarted.value = false
+    resetQuestionState()
   })
+
+  ws.connect()
+}
+
+const resetQuestionState = () => {
+  hasAnswered.value = false
+  canAnswer.value = false
+  playingStage.value = null
+  showingAnswer.value = false
+  answerResult.value = null
+}
+
+const submitAnswer = (option: string) => {
+  if (!canAnswer.value || hasAnswered.value) return
+
+  hasAnswered.value = true
+  canAnswer.value = false
   
-  const resetQuestionState = () => {
-    hasAnswered.value = false
-    canAnswer.value = false
-    currentAudio.value = 0
-    showCorrectAnswer.value = false
-    answerResult.value = null
-  }
-  
-  const submitAnswer = (option: string) => {
-    if (!ws || !canAnswer.value || hasAnswered.value) return
-  
-    ws.send({
-      type: 'answer',
-      answer: {
-        questionId: currentQuestionIndex.value,
-        option,
-        timestamp: Date.now()
-      }
-    })
-  
-    hasAnswered.value = true
-  }
-  </script>
+  // 发送答案到服务器
+  ws?.send({
+    type: 'answer',
+    answer: {
+      questionId: currentQuestionIndex.value,
+      option,
+      timestamp: Date.now()
+    }
+  })
+}
+
+const getOptionLabel = (value: string) => {
+  return currentOptions.value.find(opt => opt.value === value)?.label || value
+}
+
+// 初始化连接
+connectToServer()
+</script>
