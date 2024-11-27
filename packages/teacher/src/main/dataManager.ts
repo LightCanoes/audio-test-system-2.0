@@ -21,22 +21,34 @@ export class DataManager {
     }
   }
 
-  async saveTestSettingsToFile() {
-    const result = await dialog.showSaveDialog({
-      filters: [{ name: 'Test Settings', extensions: ['json'] }],
-      defaultPath: join(app.getPath('documents'), 'test-settings.json')
-    })
-
-    if (!result.canceled && result.filePath) {
-      try {
-        const data = await this.loadTestData()
-        if (data) {
-          await fs.writeFile(result.filePath, JSON.stringify(data, null, 2))
-        }
-      } catch (error) {
-        console.error('Failed to save test settings:', error)
-        throw error
+  async saveTestSettingsToFile(data: TestSettings) {
+    try {
+      // 清理数据中的循环引用
+      const cleanData = {
+        ...data,
+        audioFiles: data.audioFiles?.map(file => ({
+          id: file.id,
+          path: file.originalPath,
+          name: file.name,
+          comment: file.comment || ''
+        }))
       }
+
+      const result = await dialog.showSaveDialog({
+        filters: [{ name: 'Test Settings', extensions: ['json'] }],
+        defaultPath: join(app.getPath('documents'), 'test-settings.json')
+      })
+
+      if (!result.canceled && result.filePath) {
+        await fs.writeFile(
+          result.filePath, 
+          JSON.stringify(cleanData, null, 2),
+          'utf-8'
+        )
+      }
+    } catch (error) {
+      console.error('Failed to save test settings:', error)
+      throw error
     }
   }
 

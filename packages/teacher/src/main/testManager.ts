@@ -1,5 +1,7 @@
+// src/main/testManager.ts
 import { WebSocketServer, WebSocket } from 'ws'
 import { EventEmitter } from 'events'
+import { URL } from 'url'
 import type { TestSettings, TestSequence } from '../renderer/types'
 
 interface Answer {
@@ -46,55 +48,66 @@ export class TestManager extends EventEmitter {
   private test: TestSettings | null = null
   private currentQuestionIndex: number = -1
   private stats: TestStats | null = null
+  private audioBasePath: string = ''
 
-  constructor() {
+  constructor(audioBasePath: string = '') {
     super()
-    // 在构造函数中自动启动服务器
-    this.startServer()
+    this.audioBasePath = audioBasePath
   }
 
-  private startServer() {
-    if (this.wss) return
+  public startServer(): boolean {
+    if (this.wss) return false
+  
+    try {
+      this.wss = new WebSocketServer({ 
+        port: 8080,
+        path: '/ws',  // WebSocket 专用路径
+        verifyClient: (_info, callback) => {
+          callback(true)
+        }
+      }, () => {
+        console.log('WebSocket server started on port 8080')
+      })
+  
+      this.setupServerHandlers()
+      return true
+    } catch (error) {
+      console.error('Failed to start WebSocket server:', error)
+      return false
+    }
+  }
 
-    this.wss = new WebSocketServer({ port: 8080 })
+  private setupServerHandlers() {
+    if (!this.wss) return
 
-    this.wss.on('connection', (ws, request) => {
+    this.wss.on('connection', (ws: WebSocket) => {
+      console.log('New connection established')
       const clientId = Date.now().toString()
-      const isTeacher = request.url?.includes('teacher')
-
-      if (!isTeacher) {
-        this.students.set(clientId, {
-          id: clientId,
-          answers: [],
-          correctCount: 0,
-          totalAnswered: 0,
-          correctRate: 0
-        })
-      }
-
-        // 通知教师新学生连接
-        this.broadcastToTeachers({
-          type: 'student-connected',
-          student: this.students.get(clientId)
-        })
-
-
-      // 发送初始状态
-      this.sendToClient(ws, {
-        type: 'connection-status',
-        status: 'connected',
+      
+      // 初始化学生数据
+      this.students.set(clientId, {
         id: clientId,
-        role: isTeacher ? 'teacher' : 'student'
+        answers: [],
+        correctCount: 0,
+        totalAnswered: 0,
+        correctRate: 0
       })
 
+      // 通知教师端有新学生连接
+      this.broadcastToTeachers({
+        type: 'student-connected',
+        student: this.students.get(clientId)
+      })
+
+      // 发送初始状态给学生
       if (this.test) {
-        // 发送当前测试状态
-        this.sendToClient(ws, {
-          type: 'test-state',
-          test: this.test,
-          currentQuestionIndex: this.currentQuestionIndex,
-          stats: this.stats
-        })
+        ws.send(JSON.stringify({
+          type: 'init',
+          data: {
+            test: this.test,
+            currentQuestion: this.currentQuestionIndex
+          }
+        }))
       }
 
       ws.on('message', (data) => {
@@ -107,15 +120,24 @@ export class TestManager extends EventEmitter {
       })
 
       ws.on('close', () => {
-        if (!isTeacher) {
-          this.students.delete(clientId)
-          this.broadcastToTeachers({
-            type: 'student-disconnected',
-            studentId: clientId
-          })
-        }
+        this.students.delete(clientId)
+        this.broadcastToTeachers({
+          type: 'student-disconnected',
+          studentId: clientId
+        })
       })
     })
+
+    this.wss.on('error', (error) => {
+      console.error('WebSocket server error:', error)
+    })
+  }
+
+
+  private getAudioPath(fileId: string): string {
+    if (!this.test?.audioFiles) return ''
+    const audioFile = this.test.audioFiles.find(f => f.id === fileId)
+    return audioFile ? audioFile.path : ''
   }
 
   private handleMessage(clientId: string, message: any, ws: WebSocket) {
@@ -272,23 +294,26 @@ export class TestManager extends EventEmitter {
     }
   }
   
-  startTest(testData: TestSettings) {
+  public startTest(testData: TestSettings): boolean {
+    if (!this.wss) return false
+    
     this.test = testData
     this.currentQuestionIndex = 0
-    this.initializeStats()
-  
-    this.wss?.clients.forEach(client => {
+    
+    // 广播测试开始消息
+    this.wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        this.sendToClient(client, {
+        client.send(JSON.stringify({
           type: 'test-start',
-          currentQuestionIndex: this.currentQuestionIndex,
-          totalQuestions: this.test.sequences.length,
-          options: this.test.sequences[0].options,
-          instruction: this.test.instruction,
-          lightSettings: this.test.lightSettings
-        })
+          data: {
+            test: this.test,
+            currentQuestion: this.currentQuestionIndex
+          }
+        }))
       }
     })
+    
+    return true
   }
   
   nextQuestion() {

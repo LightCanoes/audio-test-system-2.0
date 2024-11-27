@@ -1,11 +1,66 @@
+// src/main/audioManager.ts
 import { join } from 'path'
-import { dialog, BrowserWindow } from 'electron'
+import { app, dialog, BrowserWindow, protocol } from 'electron'
+import { promises as fs } from 'fs'
 import type { AudioFile } from '../renderer/types'
 
 export class AudioManager {
   private files: Map<string, AudioFile> = new Map()
+  private audioBasePath: string
 
-  constructor() {}
+  constructor(userDataPath: string) {
+    if (!userDataPath) {
+      throw new Error('userDataPath is required')
+    }
+    this.audioBasePath = join(userDataPath, 'audio')
+    this.ensureAudioDirectory()
+  }
+
+  private async ensureAudioDirectory() {
+    try {
+      await fs.mkdir(this.audioBasePath, { recursive: true })
+    } catch (error) {
+      console.error('Failed to create audio directory:', error)
+    }
+  }
+
+  setupProtocol() {
+    if (protocol) {
+      protocol.registerFileProtocol('audio', (request, callback) => {
+        try {
+          const filePath = decodeURI(request.url.replace('audio://', ''))
+          callback({ path: filePath })
+        } catch (error) {
+          console.error('Protocol error:', error)
+          callback({ error: -2 /* net::FAILED */ })
+        }
+      })
+    }
+  }
+
+  async playAudio(fileId: string, window: BrowserWindow | null) {
+    const file = this.files.get(fileId)
+    if (!file || !window) return false
+
+    try {
+      // 检查文件是否存在
+      await fs.access(file.originalPath)
+      
+      // 使用 audio:// 协议
+      const fileUrl = `audio://${encodeURI(file.originalPath)}`
+      window.webContents.send('audio-control', { 
+        type: 'play', 
+        path: fileUrl,
+        id: file.id 
+      })
+      return true
+    } catch (error) {
+      console.error('Error playing audio:', error)
+      return false
+    }
+  }
+
+
 
   async importAudioFiles() {
     const result = await dialog.showOpenDialog({
@@ -26,7 +81,7 @@ export class AudioManager {
           id,
           path: filePath,
           name,
-          originalPath: filePath,
+          originalPath: filePath,  // 保持原始路径
           comment: ''
         }
         
@@ -46,7 +101,6 @@ export class AudioManager {
   setAudioFiles(files: AudioFile[]) {
     this.files.clear()
     for (const file of files) {
-      // 确保文件路径存在
       if (file.path && file.originalPath) {
         this.files.set(file.id, {
           ...file,
@@ -57,20 +111,13 @@ export class AudioManager {
   }
 
   deleteAudioFile(fileId: string) {
+    if (this.currentAudio?.id === fileId) {
+      this.stopAudio(this.currentAudio.window)
+    }
     return this.files.delete(fileId)
   }
 
-  playAudio(fileId: string, window: BrowserWindow | null) {
-    const file = this.files.get(fileId)
-    if (!file || !window) return false
 
-    window.webContents.send('audio-control', { 
-      type: 'play', 
-      path: file.originalPath,  // 使用原始文件路径
-      id: file.id 
-    })
-    return true
-  }
 
   pauseAudio(window: BrowserWindow | null) {
     if (!window) return false
@@ -87,6 +134,7 @@ export class AudioManager {
   stopAudio(window: BrowserWindow | null) {
     if (!window) return false
     window.webContents.send('audio-control', { type: 'stop' })
+    this.currentAudio = null
     return true
   }
 }

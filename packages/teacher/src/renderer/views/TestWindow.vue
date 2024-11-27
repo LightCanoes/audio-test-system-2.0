@@ -16,7 +16,7 @@
       </div>
 
       <div class="text-sm text-gray-600">
-        接続URL: ws://{{ serverAddress }}:8080
+        接続URL: http://{{ serverAddress }}:8080
       </div>
 
       <div class="flex space-x-4">
@@ -268,24 +268,6 @@ import type {
 } from '../types'
 import { getServerAddress } from '../utils/network'
 
-// 更新状态类型
-interface TestState {
-  currentQuestion: number
-  currentStage: 'wait' | 'audio1' | 'pause' | 'audio2' | 'answer' | null
-  isPlaying: boolean
-  isPaused: boolean
-  showingAnswer: boolean
-  students: StudentStats[]
-  stats: {
-    current: QuestionStats
-    all: QuestionStats[]
-    overall: {
-      correctRate: number
-      averageTime: number
-    }
-  }
-}
-
 // 状態管理
 const isStarted = ref(false)
 const isPlaying = ref(false)
@@ -309,9 +291,9 @@ const totalQuestions = computed(() =>
 )
 
 // 学生と統計データ
-const students = ref<any[]>([])
-const currentQuestionStats = ref<any>(null)
-const questionStats = ref<any[]>([])
+const students = ref<StudentStats[]>([])
+const currentQuestionStats = ref<QuestionStats | null>(null)
+const questionStats = ref<QuestionStats[]>([])
 const testStats = ref<any>(null)
 
 // タイマー管理
@@ -434,6 +416,7 @@ const startQuestionSequence = async () => {
     
     if (!isPlaying.value) return
 
+    // 次の問題へ
     await handleQuestionEnd()
   } catch (error) {
     console.error('Error in question sequence:', error)
@@ -498,7 +481,7 @@ const resumeAudio = async () => {
   }
 }
 
-const getStudentStatusClass = (student: any) => {
+const getStudentStatusClass = (student: StudentStats) => {
   if (!student.currentAnswer) return 'bg-gray-50'
   if (showingAnswer.value) {
     return student.currentAnswer === currentSequence.value?.correctOption
@@ -524,8 +507,18 @@ const closeResults = () => {
 
 // 初期化とクリーンアップ
 onMounted(async () => {
-  // サーバーアドレスを取得
+  // サーバーアドレスを取得して表示
   serverAddress.value = await getServerAddress()
+  
+  // 接続情報を表示
+  const connectInfo = document.createElement('div')
+  connectInfo.className = 'fixed bottom-4 right-4 bg-white p-4 rounded-lg shadow'
+  connectInfo.innerHTML = `
+    <p class="text-sm font-medium">接続方法</p>
+    <p class="text-xs text-gray-600">ブラウザで以下のURLにアクセス:</p>
+    <p class="text-sm font-mono">http://${serverAddress.value}:8080/student</p>
+  `
+  document.body.appendChild(connectInfo)
 
   // テストデータの初期化
   window.electronAPI.onInitTestData((data) => {
@@ -533,6 +526,7 @@ onMounted(async () => {
     totalQuestions.value = data.sequences.length
   })
 
+  // 状態更新の監視
   window.electronAPI.onTestStateUpdate((state) => {
     students.value = state.students
     currentQuestionStats.value = state.currentQuestionStats

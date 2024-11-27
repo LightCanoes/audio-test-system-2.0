@@ -1,3 +1,4 @@
+// src/main/index.ts
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { AudioManager } from './audioManager'
@@ -30,14 +31,17 @@ const createMainWindow = () => {
   }
 }
 
+// 创建测试窗口时启动服务器
 const createTestWindow = async (testData: TestSettings) => {
+  if (!testManager?.startServer()) {
+    console.error('Failed to start test server')
+    return
+  }
+
   if (testWindow) {
     testWindow.focus()
     return
   }
-
-  // WebSocketサーバーを起動
-  testManager?.startServer()
 
   testWindow = new BrowserWindow({
     width: 1600,
@@ -72,6 +76,7 @@ const setupIpcHandlers = () => {
   ipcMain.handle('get-audio-files', () => audioManager?.getAudioFiles())
   ipcMain.handle('select-audio-files', () => audioManager?.importAudioFiles())
   ipcMain.handle('delete-audio-file', (_, fileId) => audioManager?.deleteAudioFile(fileId))
+  ipcMain.handle('set-audio-files', (_, files) => audioManager?.setAudioFiles(files))
 
   // 音声再生制御
   ipcMain.handle('play-audio', (event, fileId) => {
@@ -135,8 +140,13 @@ const setupIpcHandlers = () => {
   })
 
   // ファイル管理
-  ipcMain.handle('save-test-settings-to-file', () => {
-    return dataManager?.saveTestSettingsToFile()
+  ipcMain.handle('save-test-settings-to-file', async (_, data) => {
+    try {
+      return await dataManager?.saveTestSettingsToFile(data)
+    } catch (error) {
+      console.error('Failed to save settings:', error)
+      throw error
+    }
   })
 
   ipcMain.handle('load-test-settings-from-file', () => {
@@ -144,7 +154,9 @@ const setupIpcHandlers = () => {
   })
 
   // テスト制御
-  ipcMain.handle('start-test', (_, data) => testManager?.startTest(data))
+  ipcMain.handle('start-test', async (_, testData) => {
+    return testManager?.startTest(testData)
+  })
   ipcMain.handle('pause-test', () => testManager?.pauseTest())
   ipcMain.handle('resume-test', () => testManager?.resumeTest())
   ipcMain.handle('stop-test', () => testManager?.stopTest())
@@ -152,18 +164,21 @@ const setupIpcHandlers = () => {
 }
 
 app.whenReady().then(async () => {
-  // 各マネージャーの初期化
-  audioManager = new AudioManager()
-  
+  // 初始化各个管理器
+  audioManager = new AudioManager(app.getPath('userData'))  // 确保传入正确的路径
+  try {
+    audioManager.setupProtocol()
+  } catch (error) {
+    console.error('Failed to setup protocol:', error)
+  }
   dataManager = new DataManager(app.getPath('userData'))
   await dataManager.init()
-  
   testManager = new TestManager()
 
-  // IPC ハンドラーの設定
+  // 设置IPC处理器
   setupIpcHandlers()
 
-  // メインウィンドウの作成
+  // 创建主窗口
   createMainWindow()
 })
 

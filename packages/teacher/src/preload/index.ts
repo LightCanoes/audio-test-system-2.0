@@ -1,3 +1,4 @@
+// src/preload/index.ts
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AudioFile, TestSettings } from '../renderer/types'
 
@@ -12,8 +13,9 @@ type AudioControlEvent = {
 contextBridge.exposeInMainWorld('electronAPI', {
   // 音声ファイル管理
   getAudioFiles: () => ipcRenderer.invoke('get-audio-files'),
-  importAudioFiles: () => ipcRenderer.invoke('select-audio-files'),  // renamed to clarify purpose
+  importAudioFiles: () => ipcRenderer.invoke('select-audio-files'),
   deleteAudioFile: (fileId: string) => ipcRenderer.invoke('delete-audio-file', fileId),
+  setAudioFiles: (files: AudioFile[]) => ipcRenderer.invoke('set-audio-files', files),
   
   // 音声再生制御
   playAudio: (fileId: string) => ipcRenderer.invoke('play-audio', fileId),
@@ -23,46 +25,62 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // 音声制御イベント
   onAudioControl: (callback: (event: AudioControlEvent) => void) => {
-    ipcRenderer.on('audio-control', (_, data) => callback(data))
-    return () => {
+    const cleanup = () => {
       ipcRenderer.removeAllListeners('audio-control')
     }
+    
+    ipcRenderer.on('audio-control', (_, data) => callback(data))
+    return cleanup
   },
 
   // 設定ファイル操作
-  saveTestSettingsToFile: () => ipcRenderer.invoke('save-test-settings-to-file'),
-  loadTestSettingsFromFile: () => ipcRenderer.invoke('load-test-settings-from-file'),
+  saveTestSettingsToFile: (data: TestSettings) => 
+    ipcRenderer.invoke('save-test-settings-to-file', data),
+  
+  loadTestSettingsFromFile: () => 
+    ipcRenderer.invoke('load-test-settings-from-file'),
 
   // テストデータ管理
-  saveTestData: (data: TestSettings) => ipcRenderer.invoke('save-test-data', data),
-  loadTestData: () => ipcRenderer.invoke('load-test-data'),
+  saveTestData: (data: TestSettings) => 
+    ipcRenderer.invoke('save-test-data', data),
+  
+  loadTestData: () => 
+    ipcRenderer.invoke('load-test-data'),
   
   // テストウィンドウ管理
-  createTestWindow: (testData: TestSettings) => ipcRenderer.invoke('create-test-window', testData),
+  createTestWindow: (testData: TestSettings) => 
+    ipcRenderer.invoke('create-test-window', testData),
   
   // テスト制御
-  startTest: (testData: TestSettings) => ipcRenderer.invoke('start-test', testData),
+  startTest: (testData: TestSettings) => 
+    ipcRenderer.invoke('start-test', testData),
+  
   pauseTest: () => ipcRenderer.invoke('pause-test'),
   resumeTest: () => ipcRenderer.invoke('resume-test'),
   stopTest: () => ipcRenderer.invoke('stop-test'),
   nextQuestion: () => ipcRenderer.invoke('next-question'),
   
   // ネットワーク関連
-  getNetworkAddresses: () => ipcRenderer.invoke('get-network-addresses'),
+  getNetworkAddresses: () => 
+    ipcRenderer.invoke('get-network-addresses'),
   
   // イベントリスナー
   onTestStateUpdate: (callback: (state: any) => void) => {
-    ipcRenderer.on('test-state-update', (_, state) => callback(state))
-    return () => {
+    const cleanup = () => {
       ipcRenderer.removeAllListeners('test-state-update')
     }
+    
+    ipcRenderer.on('test-state-update', (_, state) => callback(state))
+    return cleanup
   },
   
   onInitTestData: (callback: (data: TestSettings) => void) => {
-    ipcRenderer.on('init-test-data', (_, data) => callback(data))
-    return () => {
+    const cleanup = () => {
       ipcRenderer.removeAllListeners('init-test-data')
     }
+    
+    ipcRenderer.on('init-test-data', (_, data) => callback(data))
+    return cleanup
   }
 })
 
@@ -70,40 +88,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
 declare global {
   interface Window {
     electronAPI: {
-      // 音声ファイル管理
       getAudioFiles: () => Promise<AudioFile[]>
       importAudioFiles: () => Promise<AudioFile[]>
       deleteAudioFile: (fileId: string) => Promise<boolean>
+      setAudioFiles: (files: AudioFile[]) => Promise<void>
       
-      // 音声再生制御
       playAudio: (fileId: string) => Promise<boolean>
       pauseAudio: () => Promise<boolean>
       resumeAudio: () => Promise<boolean>
       stopAudio: () => Promise<boolean>
       onAudioControl: (callback: (event: AudioControlEvent) => void) => () => void
       
-      // 設定ファイル操作
-      saveTestSettingsToFile: () => Promise<void>
+      saveTestSettingsToFile: (data: TestSettings) => Promise<void>
       loadTestSettingsFromFile: () => Promise<TestSettings | null>
       
-      // テストデータ管理
       saveTestData: (data: TestSettings) => Promise<void>
       loadTestData: () => Promise<TestSettings>
       
-      // テストウィンドウ管理
       createTestWindow: (testData: TestSettings) => Promise<void>
       
-      // テスト制御
       startTest: (testData: TestSettings) => Promise<void>
       pauseTest: () => Promise<void>
       resumeTest: () => Promise<void>
       stopTest: () => Promise<void>
       nextQuestion: () => Promise<void>
       
-      // ネットワーク関連
       getNetworkAddresses: () => Promise<string[]>
       
-      // イベントリスナー
       onTestStateUpdate: (callback: (state: any) => void) => () => void
       onInitTestData: (callback: (data: TestSettings) => void) => () => void
     }

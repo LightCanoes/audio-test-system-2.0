@@ -57,7 +57,7 @@
           <div class="p-4">
             <!-- ボタン設定 -->
             <div v-if="currentTab === 'buttons'" class="space-y-4">
-              <div class="flex justify-between items-center">
+              <div class="flex justify-between items-center mb-4">
                 <h3 class="font-medium">ボタン設定</h3>
                 <button
                   @click="addButton"
@@ -67,35 +67,32 @@
                 </button>
               </div>
 
-              <table class="w-full">
-                <thead class="bg-gray-50">
-                  <tr>
-                    <th class="px-2 py-1 text-left w-20">ID</th>
-                    <th class="px-2 py-1 text-left">ラベル</th>
-                    <th class="w-16"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(button, index) in testSettings.options" :key="index">
-                    <td class="px-2 py-1">{{ button.value }}</td>
-                    <td class="px-2 py-1">
-                      <input
-                        v-model="button.label"
-                        class="w-full p-2 border rounded"
-                        placeholder="ラベル"
-                      />
-                    </td>
-                    <td class="px-2 py-1">
-                      <button
-                        @click="deleteButton(index)"
-                        class="p-1 text-red-500 hover:text-red-600"
-                      >
-                        <TrashIcon class="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div class="space-y-2">
+                <div
+                  v-for="(button, index) in testSettings.options"
+                  :key="index"
+                  class="flex items-center space-x-4"
+                >
+                  <div class="w-20">
+                    <span class="text-sm text-gray-600">ID: {{ button.value }}</span>
+                  </div>
+                  <div class="flex-grow">
+                    <input
+                      v-model="button.label"
+                      class="w-full p-2 border rounded"
+                      placeholder="ラベル"
+                    />
+                  </div>
+                  <div>
+                    <button
+                      @click="deleteButton(index)"
+                      class="p-1 text-red-500 hover:text-red-600"
+                    >
+                      <TrashIcon class="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- 教示文設定 -->
@@ -149,6 +146,7 @@
       </div>
 
       <!-- 右側：スケジュールリスト -->
+       
       <div class="col-span-6 bg-white rounded-lg shadow p-4">
         <div class="flex justify-between items-center mb-4">
           <h3 class="font-medium">スケジュールリスト</h3>
@@ -160,54 +158,50 @@
           </button>
         </div>
 
-        <table class="w-full text-sm">
+        <table class="w-full text-sm border-collapse">
           <thead>
-            <tr class="border-b">
-              <th class="w-6"></th>
-              <th class="w-20 py-2 font-normal text-center">反復回数</th>
-              <th class="w-16 py-2 font-normal text-center">開始時間</th>
-              <th class="w-24 py-2 font-normal text-center">刺激1</th>
-              <th class="w-16 py-2 font-normal text-center">休止</th>
-              <th class="w-24 py-2 font-normal text-center">刺激2</th>
-              <th class="w-16 py-2 font-normal text-center">制限時間</th>
-              <th class="w-24 py-2 font-normal text-center">正答ボタン</th>
-              <th class="w-20"></th>
-            </tr>
-            <tr class="text-xs text-gray-500">
-              <th></th>
-              <th class="text-center pt-1">[回]</th>
-              <th class="text-center pt-1">[秒]</th>
-              <th class="text-center pt-1">[ID]</th>
-              <th class="text-center pt-1">[秒]</th>
-              <th class="text-center pt-1">[ID]</th>
-              <th class="text-center pt-1">[秒]</th>
-              <th></th>
-              <th></th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <draggable
-              v-model="testSettings.sequences"
-              tag="tbody"
-              item-key="id"
-              handle=".drag-handle"
-              :animation="150"
-              ghost-class="opacity-50"
-            >
-              <template #item="{ element: sequence, index }">
-                <tr 
-                  class="border-b hover:bg-gray-50"
-                  :class="{ 'border-blue-500 border-2': currentPlayingIndex === index && isPlaying }"
-                >
-                  <td class="py-2 px-2">
-                    <div class="flex items-center">
-                      <button class="drag-handle cursor-move">
-                        <Bars3Icon class="w-4 h-4 text-gray-400" />
-                      </button>
-                      <span class="ml-1">試行{{ index + 1 }}</span>
-                    </div>
-                  </td>
+            
+              <tr>
+                <th class="px-4 py-2 font-normal text-left bg-gray-50" rowspan="2">試行</th>
+                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="80">反復回数</th>
+                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="80">開始時間</th>
+                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="120">刺激1</th>
+                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="80">休止</th>
+                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="120">刺激2</th>
+                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="80">制限時間</th>
+                <th class="px-2 py-2 font-normal text-center bg-gray-50" rowspan="2" width="120">正答ボタン</th>
+                <th class="px-2 py-2 font-normal text-center bg-gray-50" rowspan="2" width="100"></th>
+              </tr>
+              <tr>
+                <th class="px-2 pt-0 pb-2 text-xs text-gray-500 text-center bg-gray-50 font-normal">[回]</th>
+                <th class="px-2 pt-0 pb-2 text-xs text-gray-500 text-center bg-gray-50 font-normal">[秒]</th>
+                <th class="px-2 pt-0 pb-2 text-xs text-gray-500 text-center bg-gray-50 font-normal">[ID]</th>
+                <th class="px-2 pt-0 pb-2 text-xs text-gray-500 text-center bg-gray-50 font-normal">[秒]</th>
+                <th class="px-2 pt-0 pb-2 text-xs text-gray-500 text-center bg-gray-50 font-normal">[ID]</th>
+                <th class="px-2 pt-0 pb-2 text-xs text-gray-500 text-center bg-gray-50 font-normal">[秒]</th>
+              </tr>
+            </thead>
+          <draggable
+            v-model="testSettings.sequences"
+            tag="tbody"
+            item-key="id"
+            handle=".drag-handle"
+            :animation="150"
+            ghost-class="opacity-50"
+          >
+            <template #item="{ element: sequence, index }">
+              <tr 
+                class="border-b hover:bg-gray-50"
+                :class="{ 'border-blue-500 border-2': currentPlayingIndex === index && isPlaying }"
+              >
+                <td class="px-4 py-2">
+                  <div class="flex items-center">
+                    <button class="drag-handle cursor-move mr-2">
+                      <Bars3Icon class="w-4 h-4 text-gray-400" />
+                    </button>
+                    <span>試行{{ index + 1 }}</span>
+                  </div>
+                </td>
                   <td class="px-1 py-1">
                     <input
                       v-model.number="sequence.repeatCount"
@@ -330,7 +324,6 @@
                 </tr>
               </template>
             </draggable>
-          </tbody>
         </table>
       </div>
     </div>
@@ -369,7 +362,7 @@ const currentTab = ref('buttons')
 const testSettings = ref<TestSettings>({
   instruction: '',
   options: [
-    { value: 'A', label: 'A' }
+    { value: '1', label: '1' }
   ],
   sequences: [],
   lightSettings: {
@@ -409,9 +402,7 @@ const deleteSequence = (index: number) => {
 
 // ボタン管理
 const addButton = () => {
-  const lastButton = testSettings.value.options[testSettings.value.options.length - 1]
-  const nextValue = String.fromCharCode(lastButton.label.charCodeAt(0) + 1)
-  
+  const nextValue = (testSettings.value.options.length + 1).toString()
   testSettings.value.options.push({
     value: nextValue,
     label: nextValue
@@ -463,11 +454,12 @@ const playSequence = async (index: number) => {
 
     // 音源2
     await window.electronAPI.playAudio(sequence.audio2)
+    
+    // 回答時間
+    await new Promise(resolve => setTimeout(resolve, sequence.answerTime * 1000))
 
     // 再生完了時
-    setTimeout(() => {
-      stopSequence()
-    }, 1000)  // 音源2の再生が終わってから1秒後に停止
+    stopSequence()
   } catch (error) {
     console.error('Error playing sequence:', error)
     stopSequence()
@@ -484,7 +476,6 @@ const resumeSequence = async () => {
   isPlaying.value = true
   isPaused.value = false
   await window.electronAPI.resumeAudio()
-  await playSequence(currentPlayingIndex.value)
 }
 
 const stopSequence = async () => {
@@ -499,10 +490,10 @@ const handleAudioFilesUpdate = (files: AudioFile[]) => {
   audioFiles.value = files
 }
 
-// 保存と読み込み
+
 const saveSettings = async () => {
   try {
-    // クローン可能なデータだけを保存
+    // 创建一个没有循环引用的干净对象
     const settingsToSave = {
       instruction: testSettings.value.instruction,
       options: testSettings.value.options.map(opt => ({
@@ -524,7 +515,7 @@ const saveSettings = async () => {
         id: file.id,
         path: file.originalPath,
         name: file.name,
-        comment: file.comment
+        comment: file.comment || ''
       }))
     }
     
@@ -539,9 +530,17 @@ const loadSettings = async () => {
   try {
     const settings = await window.electronAPI.loadTestSettingsFromFile()
     if (settings) {
-      testSettings.value = settings
       if (settings.audioFiles) {
-        audioFiles.value = settings.audioFiles
+        await window.electronAPI.setAudioFiles(settings.audioFiles)
+        await loadAudioFiles()
+      }
+      
+      testSettings.value = {
+        ...settings,
+        sequences: settings.sequences.map(seq => ({
+          ...seq,
+          id: seq.id || Date.now().toString()
+        }))
       }
     }
   } catch (error) {
@@ -571,19 +570,15 @@ const startTest = async () => {
       }
     }
 
-    // テストデータを作成（循環参照を避ける）
-    const testData = {
-      instruction: testSettings.value.instruction,
-      options: JSON.parse(JSON.stringify(testSettings.value.options)),
-      sequences: JSON.parse(JSON.stringify(testSettings.value.sequences)),
-      lightSettings: { ...testSettings.value.lightSettings },
+    const testData = JSON.parse(JSON.stringify({
+      ...testSettings.value,
       audioFiles: audioFiles.value.map(file => ({
         id: file.id,
         path: file.originalPath,
         name: file.name,
         comment: file.comment
       }))
-    }
+    }))
 
     await window.electronAPI.createTestWindow(testData)
   } catch (error) {
@@ -595,10 +590,6 @@ const startTest = async () => {
 onMounted(async () => {
   try {
     await loadAudioFiles()
-    const savedData = await window.electronAPI.loadTestData()
-    if (savedData) {
-      testSettings.value = savedData
-    }
   } catch (error) {
     console.error('Error loading initial data:', error)
   }

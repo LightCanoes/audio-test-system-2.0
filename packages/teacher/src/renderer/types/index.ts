@@ -1,20 +1,19 @@
 // src/renderer/types/index.ts
-
 export interface AudioFile {
   id: string
   name: string
   path: string
   originalPath: string
-  comment?: string  // 追加コメント欄
+  comment?: string
 }
 
 export interface TestOption {
-  value: string    // ボタンID
-  label: string    // ボタン表示名
+  value: string    // 数值ID (1, 2, 3...)
+  label: string    // 显示文字 (同value)
 }
 
 export interface TestSequence {
-  id: string           // draggable のために必要
+  id: string
   repeatCount: number  // 反復回数
   waitTime: number     // 開始時間（秒）
   audio1: string       // 刺激1のID
@@ -32,11 +31,11 @@ export interface LightSettings {
 }
 
 export interface TestSettings {
-  instruction: string          // 教示文
-  options: TestOption[]        // ボタン設定
-  sequences: TestSequence[]    // スケジュールリスト
-  lightSettings: LightSettings // ランプ設定
-  audioFiles?: AudioFile[]     // 保存用の刺激リスト
+  instruction: string
+  options: TestOption[]
+  sequences: TestSequence[]
+  lightSettings: LightSettings
+  audioFiles?: AudioFile[]     // 保存用
 }
 
 export interface StudentStats {

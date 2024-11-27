@@ -23,13 +23,20 @@
               />
             </td>
             <td class="px-2 py-1 border-b">
-              <div class="flex space-x-1">
+              <div class="flex items-center space-x-1">
                 <button
-                  v-if="isAudioPlaying(file.id)"
-                  @click="stopAudio"
-                  class="p-1 text-red-500 hover:text-red-600"
+                  v-if="isAudioPlaying(file.id) && !isAudioPaused(file.id)"
+                  @click="pauseAudio(file.id)"
+                  class="p-1 text-yellow-500 hover:text-yellow-600"
                 >
-                  <StopIcon class="w-4 h-4" />
+                  <PauseIcon class="w-4 h-4" />
+                </button>
+                <button
+                  v-else-if="isAudioPlaying(file.id) && isAudioPaused(file.id)"
+                  @click="resumeAudio(file.id)"
+                  class="p-1 text-green-500 hover:text-green-600"
+                >
+                  <PlayIcon class="w-4 h-4" />
                 </button>
                 <button
                   v-else
@@ -37,6 +44,13 @@
                   class="p-1 text-blue-500 hover:text-blue-600"
                 >
                   <PlayIcon class="w-4 h-4" />
+                </button>
+                <button
+                  v-if="isAudioPlaying(file.id)"
+                  @click="stopAudio"
+                  class="p-1 text-red-500 hover:text-red-600"
+                >
+                  <StopIcon class="w-4 h-4" />
                 </button>
                 <button
                   @click="deleteFile(file.id)"
@@ -69,8 +83,7 @@ import type { AudioFile } from '../types'
 
 const audioFiles = ref<AudioFile[]>([])
 const currentPlayingId = ref<string | null>(null)
-
-// HTMLAudioElement for client-side playback
+const isPausedMap = ref(new Map<string, boolean>())
 let audioElement: HTMLAudioElement | null = null
 
 const emit = defineEmits<{
@@ -175,26 +188,47 @@ const deleteFile = async (fileId: string) => {
 
 const playAudio = async (fileId: string) => {
   try {
-    if (currentPlayingId.value) {
+    if (currentPlayingId.value && currentPlayingId.value !== fileId) {
       await stopAudio()
     }
     await window.electronAPI.playAudio(fileId)
     currentPlayingId.value = fileId
+    isPausedMap.value.set(fileId, false)
   } catch (error) {
     console.error('Failed to play audio:', error)
+  }
+}
+
+const pauseAudio = async (fileId: string) => {
+  try {
+    await window.electronAPI.pauseAudio()
+    isPausedMap.value.set(fileId, true)
+  } catch (error) {
+    console.error('Failed to pause audio:', error)
+  }
+}
+
+const resumeAudio = async (fileId: string) => {
+  try {
+    await window.electronAPI.resumeAudio()
+    isPausedMap.value.set(fileId, false)
+  } catch (error) {
+    console.error('Failed to resume audio:', error)
   }
 }
 
 const stopAudio = async () => {
   try {
     await window.electronAPI.stopAudio()
+    if (currentPlayingId.value) {
+      isPausedMap.value.delete(currentPlayingId.value)
+    }
     currentPlayingId.value = null
   } catch (error) {
     console.error('Failed to stop audio:', error)
   }
 }
 
-const isAudioPlaying = (fileId: string) => {
-  return currentPlayingId.value === fileId
-}
+const isAudioPlaying = (fileId: string) => currentPlayingId.value === fileId
+const isAudioPaused = (fileId: string) => isPausedMap.value.get(fileId) || false
 </script>
