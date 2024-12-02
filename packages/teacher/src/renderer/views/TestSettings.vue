@@ -162,7 +162,7 @@
           <thead>
             
               <tr>
-                <th class="px-4 py-2 font-normal text-left bg-gray-50" rowspan="2">試行</th>
+                <th class="px-4 py-2 font-normal text-center bg-gray-50" rowspan="2"　width="120">試行</th>
                 <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="80">反復回数</th>
                 <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="80">開始時間</th>
                 <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="120">刺激1</th>
