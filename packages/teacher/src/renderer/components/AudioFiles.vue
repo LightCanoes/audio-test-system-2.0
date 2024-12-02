@@ -6,9 +6,9 @@
         <thead class="bg-gray-50">
           <tr>
             <th class="px-2 py-1 border-b text-left w-20">ID</th>
-            <th class="px-2 py-1 border-b text-left w-[60%]">オリジナルファイル</th>
-            <th class="px-2 py-1 border-b text-left w-24">コメント</th>
-            <th class="px-2 py-1 border-b w-16"></th>
+            <th class="px-2 py-1 border-b text-left w-60">オリジナルファイル</th>
+            <th class="px-2 py-1 border-b text-left w-20">コメント</th>
+            <th class="px-2 py-1 border-b w-25"></th>
           </tr>
         </thead>
         <tbody>
@@ -78,7 +78,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { PlayIcon, StopIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/solid'
+import { PauseIcon, PlayIcon, StopIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/solid'
 import type { AudioFile } from '../types'
 
 const audioFiles = ref<AudioFile[]>([])
