@@ -1,3 +1,15 @@
+<style scoped>
+.input-highlight {
+  box-shadow: 0 0 0 2px #3b82f6, 0 0 8px #3b82f6;
+  border-color: transparent;
+  transition: all 0.3s ease;
+}
+
+.input-normal {
+  transition: all 0.3s ease;
+}
+</style>
+
 <template>
   <div class="min-h-screen bg-gray-100 p-6">
     <div class="mb-6 flex justify-between items-center">
@@ -30,7 +42,79 @@
       <div class="col-span-4 space-y-6">
         <!-- 刺激リスト -->
         <div class="bg-white rounded-lg shadow p-4">
-          <AudioFiles @files-updated="handleAudioFilesUpdate" />
+          <h2 class="text-xl font-bold mb-4">刺激リスト</h2>
+          <div class="border rounded overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-2 py-1 border-b text-left w-20">ID</th>
+                  <th class="px-2 py-1 border-b text-left w-60">オリジナルファイル</th>
+                  <th class="px-2 py-1 border-b text-left w-20">コメント</th>
+                  <th class="px-2 py-1 border-b w-25"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(file, index) in audioFiles" :key="file.id" class="hover:bg-gray-50">
+                  <td class="px-2 py-1 border-b">刺激{{ index + 1 }}</td>
+                  <td class="px-2 py-1 border-b">{{ file.name }}</td>
+                  <td class="px-2 py-1 border-b">
+                    <input
+                      type="text"
+                      v-model="file.comment"
+                      class="w-full p-1 text-sm border rounded"
+                    />
+                  </td>
+                  <td class="px-2 py-1 border-b">
+                    <div class="flex items-center space-x-1">
+                      <button
+                        v-if="isAudioPlaying(file.id) && !isAudioPaused(file.id)"
+                        @click="pauseAudio(file.id)"
+                        class="p-1 text-yellow-500 hover:text-yellow-600"
+                      >
+                        <PauseIcon class="w-4 h-4" />
+                      </button>
+                      <button
+                        v-else-if="isAudioPlaying(file.id) && isAudioPaused(file.id)"
+                        @click="resumeAudio(file.id)"
+                        class="p-1 text-green-500 hover:text-green-600"
+                      >
+                        <PlayIcon class="w-4 h-4" />
+                      </button>
+                      <button
+                        v-else
+                        @click="playAudio(file.id)"
+                        class="p-1 text-blue-500 hover:text-blue-600"
+                      >
+                        <PlayIcon class="w-4 h-4" />
+                      </button>
+                      <button
+                        v-if="isAudioPlaying(file.id)"
+                        @click="stopAudio"
+                        class="p-1 text-red-500 hover:text-red-600"
+                      >
+                        <StopIcon class="w-4 h-4" />
+                      </button>
+                      <button
+                        @click="deleteFile(file.id)"
+                        class="p-1 text-red-500 hover:text-red-600"
+                      >
+                        <TrashIcon class="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-2 flex justify-end">
+            <button 
+              @click="importAudioFiles"
+              class="flex items-center px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              <PlusIcon class="w-4 h-4 mr-1" />
+              追加
+            </button>
+          </div>
         </div>
 
         <!-- 基本設定 -->
@@ -162,14 +246,14 @@
           <thead>
             
               <tr>
-                <th class="px-4 py-2 font-normal text-center bg-gray-50" rowspan="2"　width="120">試行</th>
-                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="80">反復回数</th>
-                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="80">開始時間</th>
-                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="120">刺激1</th>
-                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="80">休止</th>
-                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="120">刺激2</th>
-                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="80">制限時間</th>
-                <th class="px-2 py-2 font-normal text-center bg-gray-50" rowspan="2" width="120">正答ボタン</th>
+                <th class="px-4 py-2 font-normal text-center bg-gray-50" rowspan="2"　width="100">試行</th>
+                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="70">反復回数</th>
+                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="70">開始時間</th>
+                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="100">刺激1</th>
+                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="70">休止</th>
+                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="100">刺激2</th>
+                <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="70">制限時間</th>
+                <th class="px-2 py-2 font-normal text-center bg-gray-50" rowspan="2" width="100">正答ボタン</th>
                 <th class="px-2 py-2 font-normal text-center bg-gray-50" rowspan="2" width="100"></th>
               </tr>
               <tr>
@@ -192,7 +276,6 @@
             <template #item="{ element: sequence, index }">
               <tr 
                 class="border-b hover:bg-gray-50"
-                :class="{ 'border-blue-500 border-2': currentPlayingIndex === index && isPlaying }"
               >
                 <td class="px-4 py-2">
                   <div class="flex items-center">
@@ -217,13 +300,23 @@
                       type="number"
                       min="0"
                       step="0.5"
-                      class="w-full p-1 text-sm border rounded text-center"
+                      :class="[
+                        'w-full p-1 text-sm border rounded text-center',
+                        currentPlayingIndex === index && playingStage === 'wait' 
+                          ? 'input-highlight' 
+                          : 'input-normal'
+                      ]"
                     />
                   </td>
                   <td class="px-1 py-1">
                     <select
                       v-model="sequence.audio1"
-                      class="w-full p-1 text-sm border rounded text-center"
+                      :class="[
+                        'w-full p-1 text-sm border rounded text-center',
+                        currentPlayingIndex === index && playingStage === 'audio1' 
+                          ? 'input-highlight' 
+                          : 'input-normal'
+                      ]"
                     >
                       <option value="">---</option>
                       <option 
@@ -241,13 +334,23 @@
                       type="number"
                       min="0"
                       step="0.5"
-                      class="w-full p-1 text-sm border rounded text-center"
+                      :class="[
+                        'w-full p-1 text-sm border rounded text-center',
+                        currentPlayingIndex === index && playingStage === 'pause' 
+                          ? 'input-highlight' 
+                          : 'input-normal'
+                      ]"
                     />
                   </td>
                   <td class="px-1 py-1">
                     <select
                       v-model="sequence.audio2"
-                      class="w-full p-1 text-sm border rounded text-center"
+                      :class="[
+                        'w-full p-1 text-sm border rounded text-center',
+                        currentPlayingIndex === index && playingStage === 'audio2' 
+                          ? 'input-highlight' 
+                          : 'input-normal'
+                      ]"
                     >
                       <option value="">---</option>
                       <option 
@@ -265,7 +368,12 @@
                       type="number"
                       min="1"
                       step="1"
-                      class="w-full p-1 text-sm border rounded text-center"
+                      :class="[
+                        'w-full p-1 text-sm border rounded text-center',
+                        currentPlayingIndex === index && playingStage === 'answer' 
+                          ? 'input-highlight' 
+                          : 'input-normal'
+                      ]"
                     />
                   </td>
                   <td class="px-1 py-1">
@@ -329,6 +437,8 @@
     </div>
   </div>
 </template>
+
+
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { 
@@ -340,7 +450,6 @@ import {
   PlusIcon
 } from '@heroicons/vue/24/solid'
 import draggable from 'vuedraggable'
-import AudioFiles from '../components/AudioFiles.vue'
 import type { AudioFile, TestSettings, TestSequence } from '../types'
 
 // 状態管理
@@ -349,6 +458,170 @@ const currentPlayingId = ref<string | null>(null)
 const currentPlayingIndex = ref(-1)
 const isPlaying = ref(false)
 const isPaused = ref(false)
+const isPausedMap = ref(new Map<string, boolean>())
+const playingStage = ref<'wait' | 'audio1' | 'pause' | 'audio2' | 'answer' | null>(null)
+const remainingTime = ref(0)
+// 添加状态控制
+const isSequencePlaying = ref(false)
+let countdownInterval: ReturnType<typeof setInterval> | null = null
+let audioElement: HTMLAudioElement | null = null
+
+// 添加音频播放相关的状态
+const audioPlayingId = ref<string | null>(null)    // 当前播放的音频文件ID
+const audioIsPaused = ref(false)                   // 音频是否暂停
+const sequencePlayingId = ref<string | null>(null) // 当前播放的序列ID
+
+//继承原AudioFiles.vue的内容
+const isAudioPlaying = (fileId: string) => currentPlayingId.value === fileId
+const isAudioPaused = (fileId: string) => isPausedMap.value.get(fileId) || false
+const startTimer = (duration: number) => {
+  return new Promise<void>((resolve) => {
+    if (countdownInterval) clearInterval(countdownInterval)
+    
+    const startTime = Date.now()
+    const endTime = startTime + duration
+    
+    countdownInterval = setInterval(() => {
+      if (!isPlaying.value) {
+        if (countdownInterval) clearInterval(countdownInterval)
+        return
+      }
+      
+      const now = Date.now()
+      const remaining = Math.max(0, endTime - now)
+      remainingTime.value = Math.ceil(remaining / 1000)
+      
+      if (remaining <= 0) {
+        if (countdownInterval) clearInterval(countdownInterval)
+        resolve()
+      }
+    }, 100)
+  })
+}
+const playLocalAudio = (path: string, id: string) => {
+  if (audioElement) {
+    audioElement.pause()
+    audioElement = null
+  }
+  
+  audioElement = new Audio()
+  audioElement.src = path
+  audioElement.onended = () => {
+    currentPlayingId.value = null
+  }
+  
+  audioElement.play().catch(error => {
+    console.error('Error playing audio:', error)
+    currentPlayingId.value = null
+  })
+  
+  currentPlayingId.value = id
+}
+
+const setupAudioControls = () => {
+  const cleanup = window.electronAPI.onAudioControl((event: any) => {
+    switch (event.type) {
+      case 'play':
+        playLocalAudio(event.path, event.id)
+        break
+      case 'pause':
+        if (audioElement) {
+          audioElement.pause()
+        }
+        break
+      case 'resume':
+        if (audioElement) {
+          audioElement.play()
+        }
+        break
+      case 'stop':
+        if (audioElement) {
+          audioElement.pause()
+          audioElement.currentTime = 0
+          audioElement = null
+          currentPlayingId.value = null
+        }
+        break
+    }
+  })
+
+  onUnmounted(() => {
+    cleanup()
+  })
+}
+const loadAudioFiles = async () => {
+  try {
+    audioFiles.value = await window.electronAPI.getAudioFiles()
+  } catch (error) {
+    console.error('Failed to load audio files:', error)
+  }
+}
+const importAudioFiles = async () => {
+  try {
+    await window.electronAPI.importAudioFiles()
+    await loadAudioFiles()
+  } catch (error) {
+    console.error('Failed to import audio files:', error)
+  }
+}
+const playAudio = async (fileId: string) => {
+  try {
+    if (currentPlayingId.value && currentPlayingId.value !== fileId) {
+      await stopAudio()
+    }
+    await window.electronAPI.playAudio(fileId)
+    currentPlayingId.value = fileId
+    isPausedMap.value.set(fileId, false)
+  } catch (error) {
+    console.error('Failed to play audio:', error)
+  }
+}
+
+const pauseAudio = async (fileId: string) => {
+  try {
+    await window.electronAPI.pauseAudio()
+    isPausedMap.value.set(fileId, true)
+  } catch (error) {
+    console.error('Failed to pause audio:', error)
+  }
+}
+
+const resumeAudio = async (fileId: string) => {
+  try {
+    await window.electronAPI.resumeAudio()
+    isPausedMap.value.set(fileId, false)
+  } catch (error) {
+    console.error('Failed to resume audio:', error)
+  }
+}
+
+const stopAudio = async () => {
+  try {
+    await window.electronAPI.stopAudio()
+    if (currentPlayingId.value) {
+      isPausedMap.value.delete(currentPlayingId.value)
+    }
+    currentPlayingId.value = null
+  } catch (error) {
+    console.error('Failed to stop audio:', error)
+  }
+}
+const deleteFile = async (fileId: string) => {
+  try {
+    if (confirm('本当に削除しますか？')) {
+      if (currentPlayingId.value === fileId) {
+        await stopAudio()
+      }
+      await window.electronAPI.deleteAudioFile(fileId)
+      await loadAudioFiles()
+    }
+  } catch (error) {
+    console.error('Failed to delete audio file:', error)
+  }
+}
+
+
+
 
 // 設定タブ
 const tabs = [
@@ -428,6 +701,11 @@ const deleteButton = (index: number) => {
 
 // シーケンス再生制御
 const playSequence = async (index: number) => {
+  // 如果有音频在播放，先停止它
+  if (audioPlayingId.value) {
+    await handleAudioStop()
+  }
+
   // 先に古い再生を停止
   if (currentPlayingIndex.value !== -1) {
     await stopSequence()
@@ -436,27 +714,40 @@ const playSequence = async (index: number) => {
   currentPlayingIndex.value = index
   isPlaying.value = true
   isPaused.value = false
+  sequencePlayingId.value = testSettings.value.sequences[index].id
+  isSequencePlaying.value = true
   
   const sequence = testSettings.value.sequences[index]
   
   try {
     // 待ち時間
-    await new Promise(resolve => setTimeout(resolve, sequence.waitTime * 1000))
+    playingStage.value = 'wait'
+    remainingTime.value = sequence.waitTime
+    await startTimer(sequence.waitTime * 1000)
     if (!isPlaying.value) return
 
     // 音源1
+    playingStage.value = 'audio1'
     await window.electronAPI.playAudio(sequence.audio1)
     if (!isPlaying.value) return
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
     // 休止時間
-    await new Promise(resolve => setTimeout(resolve, sequence.pauseTime * 1000))
+    playingStage.value = 'pause'
+    remainingTime.value = sequence.pauseTime
+    await startTimer(sequence.pauseTime * 1000)
     if (!isPlaying.value) return
 
     // 音源2
+    playingStage.value = 'audio2'
     await window.electronAPI.playAudio(sequence.audio2)
+    if (!isPlaying.value) return
+    await new Promise(resolve => setTimeout(resolve, 1000))
     
     // 回答時間
-    await new Promise(resolve => setTimeout(resolve, sequence.answerTime * 1000))
+    playingStage.value = 'answer'
+    remainingTime.value = sequence.answerTime
+    await startTimer(sequence.answerTime * 1000)
 
     // 再生完了時
     stopSequence()
@@ -481,7 +772,11 @@ const resumeSequence = async () => {
 const stopSequence = async () => {
   isPlaying.value = false
   isPaused.value = false
+  isSequencePlaying.value = false  // 重置序列播放状态
+  playingStage.value = null
   currentPlayingIndex.value = -1
+  remainingTime.value = 0
+  if (countdownInterval) clearInterval(countdownInterval)
   await window.electronAPI.stopAudio()
 }
 
@@ -490,6 +785,30 @@ const handleAudioFilesUpdate = (files: AudioFile[]) => {
   audioFiles.value = files
 }
 
+// 音频播放控制函数
+const handleAudioPlay = async (fileId: string) => {
+  // 只有在没有序列播放时才允许播放音频
+  if (!isSequencePlaying.value) {
+    audioPlayingId.value = fileId
+    await window.electronAPI.playAudio(fileId)
+  }
+}
+
+const handleAudioPause = async () => {
+  audioIsPaused.value = true
+  await window.electronAPI.pauseAudio()
+}
+
+const handleAudioResume = async () => {
+  audioIsPaused.value = false
+  await window.electronAPI.resumeAudio()
+}
+
+const handleAudioStop = async () => {
+  audioPlayingId.value = null
+  audioIsPaused.value = false
+  await window.electronAPI.stopAudio()
+}
 
 const saveSettings = async () => {
   try {
@@ -587,25 +906,29 @@ const startTest = async () => {
   }
 }
 
+
+
+
 onMounted(async () => {
   try {
     await loadAudioFiles()
+    setupAudioControls()
   } catch (error) {
     console.error('Error loading initial data:', error)
   }
 })
 
-const loadAudioFiles = async () => {
-  try {
-    audioFiles.value = await window.electronAPI.getAudioFiles()
-  } catch (error) {
-    console.error('Error loading audio files:', error)
-  }
-}
 
 onUnmounted(() => {
   if (currentPlayingIndex.value !== -1) {
     stopSequence()
+  }
+  if (countdownInterval) {
+    clearInterval(countdownInterval)
+  }
+  if (audioElement) {
+    audioElement.pause()
+    audioElement = null
   }
 })
 </script>
