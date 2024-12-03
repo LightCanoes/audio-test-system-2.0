@@ -42,7 +42,7 @@
       <div class="col-span-4 space-y-6">
         <!-- 刺激リスト -->
         <div class="bg-white rounded-lg shadow p-4">
-          <h2 class="text-xl font-bold mb-4">刺激リスト</h2>
+          <h2 class="font-medium mb-4">刺激リスト</h2>
           <div class="border rounded overflow-hidden">
             <table class="w-full text-sm">
               <thead class="bg-gray-50">
@@ -246,7 +246,7 @@
           <thead>
             
               <tr>
-                <th class="px-4 py-2 font-normal text-center bg-gray-50" rowspan="2"　width="100">試行</th>
+                <th class="px-4 py-2 font-normal text-center bg-gray-50" rowspan="2"　width="100"></th>
                 <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="70">反復回数</th>
                 <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="70">開始時間</th>
                 <th class="px-2 pt-2 pb-0 font-normal text-center bg-gray-50" width="100">刺激1</th>
@@ -612,12 +612,14 @@ const stopAudio = async () => {
 }
 const deleteFile = async (fileId: string) => {
   try {
-    if (confirm('本当に削除しますか？')) {
-      if (currentPlayingId.value === fileId) {
-        await stopAudio()
+    if (!isSequencePlaying.value) {
+      if (confirm('本当に削除しますか？')) {
+        if (currentPlayingId.value === fileId) {
+          await stopAudio()
+        }
+        await window.electronAPI.deleteAudioFile(fileId)
+        await loadAudioFiles()
       }
-      await window.electronAPI.deleteAudioFile(fileId)
-      await loadAudioFiles()
     }
   } catch (error) {
     console.error('Failed to delete audio file:', error)
