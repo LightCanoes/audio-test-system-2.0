@@ -67,14 +67,14 @@
                   <td class="px-2 py-1 border-b">
                     <div class="flex items-center space-x-1">
                       <button
-                        v-if="isAudioPlaying(file.id) && !isAudioPaused(file.id)"
+                        v-if="isAudioPlaying(file.id) && !isAudioPaused(file.id) &&!isSequencePlaying"
                         @click="pauseAudio(file.id)"
                         class="p-1 text-yellow-500 hover:text-yellow-600"
                       >
                         <PauseIcon class="w-4 h-4" />
                       </button>
                       <button
-                        v-else-if="isAudioPlaying(file.id) && isAudioPaused(file.id)"
+                        v-else-if="isAudioPlaying(file.id) && isAudioPaused(file.id) &&!isSequencePlaying"
                         @click="resumeAudio(file.id)"
                         class="p-1 text-green-500 hover:text-green-600"
                       >
@@ -88,7 +88,7 @@
                         <PlayIcon class="w-4 h-4" />
                       </button>
                       <button
-                        v-if="isAudioPlaying(file.id)"
+                        v-if="isAudioPlaying(file.id)&&!isPlaying &&!isSequencePlaying"
                         @click="stopAudio"
                         class="p-1 text-red-500 hover:text-red-600"
                       >
@@ -566,15 +566,19 @@ const importAudioFiles = async () => {
 }
 const playAudio = async (fileId: string) => {
   try {
-    if (currentPlayingId.value && currentPlayingId.value !== fileId) {
-      await stopAudio()
+    if (!isSequencePlaying.value) {
+        if (currentPlayingId.value && currentPlayingId.value !== fileId) {
+          await stopAudio()
+        }
+        await window.electronAPI.playAudio(fileId)
+        currentPlayingId.value = fileId
+        isPausedMap.value.set(fileId, false)
+      }   
     }
-    await window.electronAPI.playAudio(fileId)
-    currentPlayingId.value = fileId
-    isPausedMap.value.set(fileId, false)
-  } catch (error) {
+  catch (error) {
     console.error('Failed to play audio:', error)
   }
+  
 }
 
 const pauseAudio = async (fileId: string) => {
@@ -760,13 +764,26 @@ const playSequence = async (index: number) => {
 const pauseSequence = async () => {
   isPlaying.value = false
   isPaused.value = true
-  await window.electronAPI.pauseAudio()
+  // 暂停当前音频（如果在播放）
+  if (playingStage.value === 'audio1' || playingStage.value === 'audio2') {
+    await window.electronAPI.pauseAudio()
+  }
+  // 暂停计时器
+  if (countdownInterval) {
+    clearInterval(countdownInterval)
+  }
 }
 
 const resumeSequence = async () => {
   isPlaying.value = true
   isPaused.value = false
-  await window.electronAPI.resumeAudio()
+  // 根据当前阶段恢复播放
+  if (playingStage.value === 'audio1' || playingStage.value === 'audio2') {
+    await window.electronAPI.resumeAudio()
+  } else if (remainingTime.value > 0) {
+    // 恢复计时器
+    await startTimer(remainingTime.value * 1000)
+  }
 }
 
 const stopSequence = async () => {
@@ -832,7 +849,8 @@ const saveSettings = async () => {
       lightSettings: { ...testSettings.value.lightSettings },
       audioFiles: audioFiles.value.map(file => ({
         id: file.id,
-        path: file.originalPath,
+        path: file.originalPath,  // 确保使用原始路径
+        originalPath: file.originalPath,
         name: file.name,
         comment: file.comment || ''
       }))
@@ -849,17 +867,22 @@ const loadSettings = async () => {
   try {
     const settings = await window.electronAPI.loadTestSettingsFromFile()
     if (settings) {
+      // 先加载音频文件
       if (settings.audioFiles) {
-        await window.electronAPI.setAudioFiles(settings.audioFiles)
-        await loadAudioFiles()
+        // 确保数据结构完整
+        const processedAudioFiles = settings.audioFiles.map(file => ({
+          ...file,
+          originalPath: file.path,  // 确保 originalPath 存在
+        }))
+        await window.electronAPI.setAudioFiles(processedAudioFiles)
+        audioFiles.value = await window.electronAPI.getAudioFiles()
       }
       
       testSettings.value = {
-        ...settings,
-        sequences: settings.sequences.map(seq => ({
-          ...seq,
-          id: seq.id || Date.now().toString()
-        }))
+        instruction: settings.instruction,
+        options: settings.options,
+        sequences: settings.sequences,
+        lightSettings: settings.lightSettings
       }
     }
   } catch (error) {
