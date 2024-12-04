@@ -452,20 +452,22 @@ import {
 import draggable from 'vuedraggable'
 import type { AudioFile, TestSettings, TestSequence } from '../types'
 
-// 状態管理
-const audioFiles = ref<AudioFile[]>([])
-const currentPlayingId = ref<string | null>(null)
+// 音频文件相关
+const audioFiles = ref<AudioFile[]>([])               // 音频文件列表，基础数据
+const currentPlayingId = ref<string | null>(null)     // 当前播放的音频ID
+let audioElement: HTMLAudioElement | null = null      // 当前播放的音频元素
+const isPausedMap = ref(new Map<string, boolean>())   // 记录每个音频文件的暂停状态
+
+//序列播放相关：
 const currentPlayingIndex = ref(-1)
-const isPlaying = ref(false)
-const isPaused = ref(false)
-const isPausedMap = ref(new Map<string, boolean>())
 const playingStage = ref<'wait' | 'audio1' | 'pause' | 'audio2' | 'answer' | null>(null)
 const remainingTime = ref(0)
-// 添加状态控制
-const isSequencePlaying = ref(false)
 let countdownInterval: ReturnType<typeof setInterval> | null = null
-let audioElement: HTMLAudioElement | null = null
 
+// 重复了，可以删除？
+const isSequencePlaying = ref(false)
+const isPlaying = ref(false)
+const isPaused = ref(false)
 const sequencePlayingId = ref<string | null>(null) // 当前播放的序列ID
 
 //继承原AudioFiles.vue的内容
@@ -738,26 +740,26 @@ const playSequence = async (index: number) => {
     playingStage.value = 'wait'
     remainingTime.value = sequence.waitTime
     await startTimer(sequence.waitTime * 1000)
-    if (!isPlaying.value) return
+    if (isPaused.value) return
 
     // 音源1
     playingStage.value = 'audio1'
     await window.electronAPI.playAudio(sequence.audio1)
     // 音声の完了を待つ
     await waitForAudioToFinish()
-    if (!isPlaying.value) return
+    if (isPaused.value) return
 
     // 休止時間
     playingStage.value = 'pause'
     remainingTime.value = sequence.pauseTime
     await startTimer(sequence.pauseTime * 1000)
-    if (!isPlaying.value) return
+    if (isPaused.value) return
 
     // 音源2
     playingStage.value = 'audio2'
     await window.electronAPI.playAudio(sequence.audio2)
     await waitForAudioToFinish()
-    if (!isPlaying.value) return
+    if (isPaused.value) return
     
     // 回答時間
     playingStage.value = 'answer'
