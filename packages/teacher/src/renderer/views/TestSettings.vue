@@ -466,9 +466,6 @@ const isSequencePlaying = ref(false)
 let countdownInterval: ReturnType<typeof setInterval> | null = null
 let audioElement: HTMLAudioElement | null = null
 
-// 添加音频播放相关的状态
-const audioPlayingId = ref<string | null>(null)    // 当前播放的音频文件ID
-const audioIsPaused = ref(false)                   // 音频是否暂停
 const sequencePlayingId = ref<string | null>(null) // 当前播放的序列ID
 
 //继承原AudioFiles.vue的内容
@@ -706,10 +703,21 @@ const deleteButton = (index: number) => {
 }
 
 // シーケンス再生制御
+const waitForAudioToFinish = () => {
+  return new Promise<void>((resolve) => {
+    if (audioElement) {
+      audioElement.onended = () => {
+        resolve();
+      };
+    } else {
+      resolve(); // 音声要素がない場合は即時解決
+    }
+  });
+};
 const playSequence = async (index: number) => {
   // 如果有音频在播放，先停止它
-  if (audioPlayingId.value) {
-    await handleAudioStop()
+  if (currentPlayingId.value) {
+    await stopAudio()
   }
 
   // 先に古い再生を停止
@@ -735,8 +743,9 @@ const playSequence = async (index: number) => {
     // 音源1
     playingStage.value = 'audio1'
     await window.electronAPI.playAudio(sequence.audio1)
+    // 音声の完了を待つ
+    await waitForAudioToFinish()
     if (!isPlaying.value) return
-    await new Promise(resolve => setTimeout(resolve, 1000))
 
     // 休止時間
     playingStage.value = 'pause'
@@ -747,8 +756,8 @@ const playSequence = async (index: number) => {
     // 音源2
     playingStage.value = 'audio2'
     await window.electronAPI.playAudio(sequence.audio2)
+    await waitForAudioToFinish()
     if (!isPlaying.value) return
-    await new Promise(resolve => setTimeout(resolve, 1000))
     
     // 回答時間
     playingStage.value = 'answer'
@@ -796,36 +805,6 @@ const stopSequence = async () => {
   currentPlayingIndex.value = -1
   remainingTime.value = 0
   if (countdownInterval) clearInterval(countdownInterval)
-  await window.electronAPI.stopAudio()
-}
-
-// ファイル操作
-const handleAudioFilesUpdate = (files: AudioFile[]) => {
-  audioFiles.value = files
-}
-
-// 音频播放控制函数
-const handleAudioPlay = async (fileId: string) => {
-  // 只有在没有序列播放时才允许播放音频
-  if (!isSequencePlaying.value) {
-    audioPlayingId.value = fileId
-    await window.electronAPI.playAudio(fileId)
-  }
-}
-
-const handleAudioPause = async () => {
-  audioIsPaused.value = true
-  await window.electronAPI.pauseAudio()
-}
-
-const handleAudioResume = async () => {
-  audioIsPaused.value = false
-  await window.electronAPI.resumeAudio()
-}
-
-const handleAudioStop = async () => {
-  audioPlayingId.value = null
-  audioIsPaused.value = false
   await window.electronAPI.stopAudio()
 }
 
