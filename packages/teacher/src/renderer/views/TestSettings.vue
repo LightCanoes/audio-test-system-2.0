@@ -463,6 +463,8 @@ const currentPlayingIndex = ref(-1)
 const playingStage = ref<'wait' | 'audio1' | 'pause' | 'audio2' | 'answer' | null>(null)
 const remainingTime = ref(0)
 let countdownInterval: ReturnType<typeof setInterval> | null = null
+// 添加一个 Promise 来控制暂停和恢复
+let pauseResolve: (() => void) | null = null
 
 // 重复了，可以删除？
 const isSequencePlaying = ref(false)
@@ -481,15 +483,18 @@ const startTimer = (duration: number) => {
     const endTime = startTime + duration
     
     countdownInterval = setInterval(() => {
-      if (!isPlaying.value) {
-        if (countdownInterval) clearInterval(countdownInterval)
+      if (isPaused.value) {
+        if (countdownInterval) {
+          clearInterval(countdownInterval)
+          // 关键：暂停时也要 resolve Promise
+          resolve()
+        }
         return
       }
-      
       const now = Date.now()
       const remaining = Math.max(0, endTime - now)
       remainingTime.value = Math.ceil(remaining / 1000)
-      
+      console.log('你小子人呢？？？:', remainingTime.value) 
       if (remaining <= 0) {
         if (countdownInterval) clearInterval(countdownInterval)
         resolve()
@@ -740,32 +745,45 @@ const playSequence = async (index: number) => {
     playingStage.value = 'wait'
     remainingTime.value = sequence.waitTime
     await startTimer(sequence.waitTime * 1000)
-    if (isPaused.value) return
+    console.log('你小子人呢？？？:', remainingTime.value) 
+    while (isPaused.value) {
+      await new Promise<void>(resolve => {
+        pauseResolve = resolve
+      })
+    }
+
 
     // 音源1
     playingStage.value = 'audio1'
     await window.electronAPI.playAudio(sequence.audio1)
     // 音声の完了を待つ
     await waitForAudioToFinish()
-    if (isPaused.value) return
+
 
     // 休止時間
     playingStage.value = 'pause'
     remainingTime.value = sequence.pauseTime
     await startTimer(sequence.pauseTime * 1000)
-    if (isPaused.value) return
+    while (isPaused.value) {
+      await new Promise<void>(resolve => {
+        pauseResolve = resolve
+      })
+    }
 
     // 音源2
     playingStage.value = 'audio2'
     await window.electronAPI.playAudio(sequence.audio2)
     await waitForAudioToFinish()
-    if (isPaused.value) return
     
     // 回答時間
     playingStage.value = 'answer'
     remainingTime.value = sequence.answerTime
     await startTimer(sequence.answerTime * 1000)
-
+    while (isPaused.value) {
+      await new Promise<void>(resolve => {
+        pauseResolve = resolve
+      })
+    }
     // 再生完了時
     stopSequence()
   } catch (error) {
@@ -790,6 +808,12 @@ const pauseSequence = async () => {
 const resumeSequence = async () => {
   isPlaying.value = true
   isPaused.value = false
+  // 通过 resolve 让暂停的代码继续执行
+  if (pauseResolve) {
+    pauseResolve()
+    pauseResolve = null
+  }
+
   // 根据当前阶段恢复播放
   if (playingStage.value === 'audio1' || playingStage.value === 'audio2') {
     await window.electronAPI.resumeAudio()
