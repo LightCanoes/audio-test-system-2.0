@@ -494,7 +494,7 @@ const startTimer = (duration: number) => {
       const now = Date.now()
       const remaining = Math.max(0, endTime - now)
       remainingTime.value = Math.ceil(remaining / 1000)
-      console.log('你小子人呢？？？:', remainingTime.value) 
+      console.log('定时器进程剩余时间:', remainingTime.value) 
       if (remaining <= 0) {
         if (countdownInterval) clearInterval(countdownInterval)
         resolve()
@@ -744,14 +744,15 @@ const playSequence = async (index: number) => {
     // 待ち時間
     playingStage.value = 'wait'
     remainingTime.value = sequence.waitTime
+    console.log('待ち時間:', remainingTime.value) 
     await startTimer(sequence.waitTime * 1000)
-    console.log('你小子人呢？？？:', remainingTime.value) 
+    console.log('序列播放待ち時間:', remainingTime.value) 
     while (isPaused.value) {
       await new Promise<void>(resolve => {
         pauseResolve = resolve
       })
     }
-
+    console.log('等待时间 播放完了')
 
     // 音源1
     playingStage.value = 'audio1'
@@ -764,6 +765,7 @@ const playSequence = async (index: number) => {
     playingStage.value = 'pause'
     remainingTime.value = sequence.pauseTime
     await startTimer(sequence.pauseTime * 1000)
+    console.log('序列播放休止時間:', remainingTime.value) 
     while (isPaused.value) {
       await new Promise<void>(resolve => {
         pauseResolve = resolve
@@ -779,6 +781,7 @@ const playSequence = async (index: number) => {
     playingStage.value = 'answer'
     remainingTime.value = sequence.answerTime
     await startTimer(sequence.answerTime * 1000)
+    console.log('序列播放回答時間:', remainingTime.value) 
     while (isPaused.value) {
       await new Promise<void>(resolve => {
         pauseResolve = resolve
@@ -802,7 +805,9 @@ const pauseSequence = async () => {
   // 暂停计时器
   if (countdownInterval) {
     clearInterval(countdownInterval)
+    console.log('暂停后剩余时间:', remainingTime.value) 
   }
+
 }
 
 const resumeSequence = async () => {
@@ -821,6 +826,7 @@ const resumeSequence = async () => {
     // 恢复计时器
     await startTimer(remainingTime.value * 1000)
   }
+  console.log('恢复时间:', remainingTime.value) 
 }
 
 const stopSequence = async () => {
