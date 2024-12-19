@@ -1,6 +1,7 @@
 // src/main/testManager.ts
 import { WebSocketServer, WebSocket } from 'ws'
 import { EventEmitter } from 'events'
+import * as http from 'http'
 import { URL } from 'url'
 import type { TestSettings, TestSequence } from '../renderer/types'
 
@@ -43,36 +44,120 @@ interface TestStats {
 }
 
 export class TestManager extends EventEmitter {
+  private server: http.Server
   private wss: WebSocketServer | null = null
   private students: Map<string, Student> = new Map()
   private test: TestSettings | null = null
   private currentQuestionIndex: number = -1
+
   private stats: TestStats | null = null
   private audioBasePath: string = ''
 
+  private broadcastStudentList() {
+    if (!this.wss) return
+
+    const studentList = Array.from(this.students.values()).map(student => ({
+      id: student.id,
+      correctRate: student.correctRate,
+      totalAnswered: student.totalAnswered
+    }))
+
+    this.wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        try {
+          client.send(JSON.stringify({
+            type: 'student-list',
+            data: studentList
+          }))
+        } catch (error) {
+          console.error('Error broadcasting student list:', error)
+        }
+      }
+    })
+  }
+  
   constructor(audioBasePath: string = '') {
     super()
-    this.audioBasePath = audioBasePath
+    this.server = http.createServer((req, res) => {
+      console.log('Received request:', req.url)
+      if (req.url === '/' || req.url === '/student') {
+        res.writeHead(200, { 'Content-Type': 'text/html' })
+        res.end(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <title>Audio Test Student</title>
+            </head>
+            <body>
+              <div id="app">
+                <h1>Audio Test Student</h1>
+                <p id="status">Connecting to server...</p>
+              </div>
+              <script>
+                try {
+                  // 直接使用当前地址
+                  const ws = new WebSocket('ws://' + location.host);
+                  
+                  ws.onopen = () => {
+                    console.log('Connected to server');
+                    document.getElementById('status').textContent = 'Connected to server';
+                  };
+                  
+                  ws.onmessage = (event) => {
+                    console.log('Received message:', event.data);
+                    document.getElementById('status').textContent = 'Message: ' + event.data;
+                  };
+                  
+                  ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    document.getElementById('status').textContent = 'Connection error';
+                  };
+                  
+                  ws.onclose = () => {
+                    console.log('Disconnected from server');
+                    document.getElementById('status').textContent = 'Disconnected from server';
+                  };
+                } catch (error) {
+                  console.error('Error creating WebSocket:', error);
+                  document.getElementById('status').textContent = 'Failed to create connection: ' + error;
+                }
+              </script>
+            </body>
+          </html>
+        `)
+      } else {
+        console.log('404 for:', req.url)
+        res.writeHead(404)
+        res.end()
+      }
+    })
   }
 
   public startServer(): boolean {
     if (this.wss) return false
-  
+
     try {
-      this.wss = new WebSocketServer({ 
-        port: 8080,
-        path: '/ws',  // WebSocket 专用路径
-        verifyClient: (_info, callback) => {
-          callback(true)
-        }
-      }, () => {
-        console.log('WebSocket server started on port 8080')
+      // 先启动 HTTP 服务器
+      this.server.listen(8080, () => {
+        console.log('HTTP server is running on port 8080')
+
+        // 创建 WebSocket 服务器，不指定 path
+        this.wss = new WebSocketServer({ 
+          server: this.server,
+          // 移除 path 配置，让它处理所有 WebSocket 请求
+          perMessageDeflate: false
+        })
+
+        console.log('WebSocket server created')
+
+        this.setupServerHandlers()
       })
-  
-      this.setupServerHandlers()
+
       return true
     } catch (error) {
-      console.error('Failed to start WebSocket server:', error)
+      console.error('Failed to start server:', error)
+      this.stopServer()
       return false
     }
   }
@@ -81,7 +166,7 @@ export class TestManager extends EventEmitter {
     if (!this.wss) return
 
     this.wss.on('connection', (ws: WebSocket) => {
-      console.log('New connection established')
+      console.log('New client connected')
       const clientId = Date.now().toString()
       
       // 初始化学生数据
@@ -93,13 +178,7 @@ export class TestManager extends EventEmitter {
         correctRate: 0
       })
 
-      // 通知教师端有新学生连接
-      this.broadcastToTeachers({
-        type: 'student-connected',
-        student: this.students.get(clientId)
-      })
-
-      // 发送初始状态给学生
+      // 如果有测试数据，发送给新连接的客户端
       if (this.test) {
         ws.send(JSON.stringify({
           type: 'init',
@@ -120,18 +199,20 @@ export class TestManager extends EventEmitter {
       })
 
       ws.on('close', () => {
+        console.log('Client disconnected:', clientId)
         this.students.delete(clientId)
-        this.broadcastToTeachers({
-          type: 'student-disconnected',
-          studentId: clientId
-        })
+        this.broadcastStudentList()
       })
+
+      // 发送当前学生列表
+      this.broadcastStudentList()
     })
 
     this.wss.on('error', (error) => {
       console.error('WebSocket server error:', error)
     })
   }
+
 
 
   private getAudioPath(fileId: string): string {
@@ -351,12 +432,17 @@ export class TestManager extends EventEmitter {
     this.stats = null
   }
   
-  stopServer() {
+  public stopServer(): void {
     if (this.wss) {
       this.wss.close(() => {
         console.log('WebSocket server closed')
       })
       this.wss = null
+    }
+    if (this.server) {
+      this.server.close(() => {
+        console.log('HTTP server closed')
+      })
     }
   }
 }

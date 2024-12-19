@@ -3,7 +3,9 @@
     "target": "ESNext",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "types": ["node"],  // 添加这行
+    "allowJs": true,    // 添加这行
+    "moduleResolution": "node",  // 确保这行存在
     "strict": true,
     "jsx": "preserve",
     "resolveJsonModule": true,

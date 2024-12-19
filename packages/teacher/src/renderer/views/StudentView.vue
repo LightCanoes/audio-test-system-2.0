@@ -195,7 +195,10 @@ const connectionStatusText = computed(() => {
 
 // WebSocket 连接
 const connectToServer = () => {
-  const ws = new WebSocketClient('ws://localhost:8080')
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+
+  const ws = new WebSocketClient(wsUrl)
   
   ws.on('connection-status', (status) => {
     connectionStatus.value = status
@@ -242,7 +245,7 @@ const connectToServer = () => {
     resetQuestionState()
   })
 
-  ws.connect()
+  ws.connect();
 }
 
 const resetQuestionState = () => {
