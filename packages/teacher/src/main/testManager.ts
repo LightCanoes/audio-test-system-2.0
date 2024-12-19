@@ -75,11 +75,10 @@ export class TestManager extends EventEmitter {
       }
     })
   }
-  
+
   constructor(audioBasePath: string = '') {
     super()
     this.server = http.createServer((req, res) => {
-      console.log('Received request:', req.url)
       if (req.url === '/' || req.url === '/student') {
         res.writeHead(200, { 'Content-Type': 'text/html' })
         res.end(`
@@ -149,7 +148,6 @@ export class TestManager extends EventEmitter {
           perMessageDeflate: false
         })
 
-        console.log('WebSocket server created')
 
         this.setupServerHandlers()
       })
@@ -388,7 +386,8 @@ export class TestManager extends EventEmitter {
           type: 'test-start',
           data: {
             test: this.test,
-            currentQuestion: this.currentQuestionIndex
+            currentQuestion: this.currentQuestionIndex,
+            totalQuestions: this.test.sequences.length
           }
         }))
       }
