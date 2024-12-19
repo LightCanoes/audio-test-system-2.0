@@ -463,8 +463,6 @@ const currentPlayingIndex = ref(-1)
 const playingStage = ref<'wait' | 'audio1' | 'pause' | 'audio2' | 'answer' | null>(null)
 const remainingTime = ref(0)
 let countdownInterval: ReturnType<typeof setInterval> | null = null
-// 添加一个 Promise 来控制暂停和恢复
-let pauseResolve: (() => void) | null = null
 
 // 重复了，可以删除？
 const isSequencePlaying = ref(false)
@@ -479,25 +477,38 @@ const startTimer = (duration: number) => {
   return new Promise<void>((resolve) => {
     if (countdownInterval) clearInterval(countdownInterval)
     
-    const startTime = Date.now()
-    const endTime = startTime + duration
+    let startTime = Date.now()
+    let endTime = startTime + duration
+    let pausedDuration = 0  // 记录暂停的总时长
     
     countdownInterval = setInterval(() => {
       if (isPaused.value) {
-        if (countdownInterval) {
-          clearInterval(countdownInterval)
-          // 关键：暂停时也要 resolve Promise
-          resolve()
+        // 记录暂停开始的时间
+        if (!pausedDuration) {
+          pausedDuration = Date.now() - startTime
         }
         return
       }
+
+      // 如果刚从暂停恢复，调整开始和结束时间
+      if (pausedDuration) {
+        const pauseTime = Date.now() - startTime - pausedDuration
+        startTime = startTime + pauseTime
+        endTime = endTime + pauseTime
+        pausedDuration = 0
+      }
+      
       const now = Date.now()
       const remaining = Math.max(0, endTime - now)
       remainingTime.value = Math.ceil(remaining / 1000)
-      console.log('定时器进程剩余时间:', remainingTime.value) 
+
+
       if (remaining <= 0) {
-        if (countdownInterval) clearInterval(countdownInterval)
-        resolve()
+        if (countdownInterval) {
+          clearInterval(countdownInterval)
+          countdownInterval = null
+        }
+        resolve()  // 只有在真正计时结束时才 resolve
       }
     }, 100)
   })
@@ -509,14 +520,19 @@ const playLocalAudio = (path: string, id: string) => {
   }
   
   audioElement = new Audio()
+  // 设置音频属性以确保正常播放
+  audioElement.preservesPitch = true  // 保持音高不变
+  audioElement.playbackRate = 1.0     // 保持播放速率
   audioElement.src = path
   audioElement.onended = () => {
     currentPlayingId.value = null
+    audioElement = null  // 播放结束时清理音频元素
   }
   
   audioElement.play().catch(error => {
     console.error('Error playing audio:', error)
     currentPlayingId.value = null
+    audioElement = null
   })
   
   currentPlayingId.value = id
@@ -585,8 +601,12 @@ const playAudio = async (fileId: string) => {
   
 }
 
+// 暂停时只暂停播放，不销毁音频元素
 const pauseAudio = async (fileId: string) => {
   try {
+    if (audioElement) {
+      audioElement.pause()
+    }
     await window.electronAPI.pauseAudio()
     isPausedMap.value.set(fileId, true)
   } catch (error) {
@@ -594,8 +614,12 @@ const pauseAudio = async (fileId: string) => {
   }
 }
 
+// 恢复时继续原来的音频元素播放
 const resumeAudio = async (fileId: string) => {
   try {
+    if (audioElement) {
+      await audioElement.play()  // 使用原来的音频元素继续播放
+    }
     await window.electronAPI.resumeAudio()
     isPausedMap.value.set(fileId, false)
   } catch (error) {
@@ -603,8 +627,14 @@ const resumeAudio = async (fileId: string) => {
   }
 }
 
+// 音频停止时才真正清理音频元素
 const stopAudio = async () => {
   try {
+    if (audioElement) {
+      audioElement.pause()
+      audioElement.currentTime = 0
+      audioElement = null
+    }
     await window.electronAPI.stopAudio()
     if (currentPlayingId.value) {
       isPausedMap.value.delete(currentPlayingId.value)
@@ -744,15 +774,7 @@ const playSequence = async (index: number) => {
     // 待ち時間
     playingStage.value = 'wait'
     remainingTime.value = sequence.waitTime
-    console.log('待ち時間:', remainingTime.value) 
     await startTimer(sequence.waitTime * 1000)
-    console.log('序列播放待ち時間:', remainingTime.value) 
-    while (isPaused.value) {
-      await new Promise<void>(resolve => {
-        pauseResolve = resolve
-      })
-    }
-    console.log('等待时间 播放完了')
 
     // 音源1
     playingStage.value = 'audio1'
@@ -765,12 +787,6 @@ const playSequence = async (index: number) => {
     playingStage.value = 'pause'
     remainingTime.value = sequence.pauseTime
     await startTimer(sequence.pauseTime * 1000)
-    console.log('序列播放休止時間:', remainingTime.value) 
-    while (isPaused.value) {
-      await new Promise<void>(resolve => {
-        pauseResolve = resolve
-      })
-    }
 
     // 音源2
     playingStage.value = 'audio2'
@@ -781,12 +797,6 @@ const playSequence = async (index: number) => {
     playingStage.value = 'answer'
     remainingTime.value = sequence.answerTime
     await startTimer(sequence.answerTime * 1000)
-    console.log('序列播放回答時間:', remainingTime.value) 
-    while (isPaused.value) {
-      await new Promise<void>(resolve => {
-        pauseResolve = resolve
-      })
-    }
     // 再生完了時
     stopSequence()
   } catch (error) {
@@ -796,37 +806,23 @@ const playSequence = async (index: number) => {
 }
 
 const pauseSequence = async () => {
-  isPlaying.value = false
   isPaused.value = true
+  isPlaying.value = false
   // 暂停当前音频（如果在播放）
   if (playingStage.value === 'audio1' || playingStage.value === 'audio2') {
     await window.electronAPI.pauseAudio()
   }
-  // 暂停计时器
-  if (countdownInterval) {
-    clearInterval(countdownInterval)
-    console.log('暂停后剩余时间:', remainingTime.value) 
-  }
+
 
 }
 
 const resumeSequence = async () => {
-  isPlaying.value = true
   isPaused.value = false
-  // 通过 resolve 让暂停的代码继续执行
-  if (pauseResolve) {
-    pauseResolve()
-    pauseResolve = null
-  }
-
+  isPlaying.value = true
   // 根据当前阶段恢复播放
   if (playingStage.value === 'audio1' || playingStage.value === 'audio2') {
     await window.electronAPI.resumeAudio()
-  } else if (remainingTime.value > 0) {
-    // 恢复计时器
-    await startTimer(remainingTime.value * 1000)
-  }
-  console.log('恢复时间:', remainingTime.value) 
+  } 
 }
 
 const stopSequence = async () => {
