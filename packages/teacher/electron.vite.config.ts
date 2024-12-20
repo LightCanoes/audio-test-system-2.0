@@ -12,7 +12,6 @@ export default defineConfig({
         external: ['ws', 'electron', 'path', 'fs', 'url', 'events', 'os', 'http']  // 添加所有需要的Node.js内置模块
       }
     },
-    entry: 'src/main/index.ts' // 添加这个入口配置
   },
   preload: {
     build: {
@@ -21,7 +20,6 @@ export default defineConfig({
         external: ['ws']
       }
     },
-    entry: 'src/preload/index.ts' // 添加这个入口配置
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),

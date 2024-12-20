@@ -1,26 +1,28 @@
+// src/renderer/router/index.ts
 import { createRouter, createWebHashHistory } from 'vue-router'
-
-const routes = [
-  {
-    path: '/',
-    name: 'settings',
-    component: () => import('../views/TestSettings.vue')
-  },
-  {
-    path: '/test',
-    name: 'test',
-    component: () => import('../views/TestWindow.vue')
-  },
-  {
-    path: '/student',  // 学生界面
-    name: 'student',
-    component: () => import('../views/StudentView.vue')
-  }
-]
+import TestSettings from '../views/TestSettings.vue'
+import TestWindow from '../views/TestWindow.vue'
+import StudentView from '../views/StudentView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
-  routes
+  routes: [
+    {
+      path: '/',
+      name: 'settings',
+      component: TestSettings
+    },
+    {
+      path: '/test',
+      name: 'test',
+      component: TestWindow
+    },
+    {
+      path: '/student',
+      name: 'student',
+      component: StudentView
+    }
+  ]
 })
 
 export default router

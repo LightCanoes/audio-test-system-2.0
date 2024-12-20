@@ -70,6 +70,10 @@
               :key="option.value"
               @click="submitAnswer(option.value)"
               class="p-4 text-center rounded-lg border-2 transition-colors hover:border-blue-500 hover:bg-blue-50"
+              :class="{
+                'border-green-500': showingAnswer && option.value === correctOption,
+                'border-gray-200': !showingAnswer || option.value !== correctOption
+              }"
             >
               {{ option.label }}
             </button>
@@ -77,46 +81,38 @@
         </div>
 
         <!-- 回答后状态 -->
-        <div v-else class="text-center py-8">
-          <div v-if="hasAnswered" class="space-y-4">
-            <p class="text-gray-600">回答を送信しました</p>
-            
-            <!-- 回答结果指示灯 -->
-            <div class="flex justify-center space-x-6">
-              <div v-if="showCorrectLight" class="text-center">
-                <div
-                  class="w-4 h-4 rounded-full mb-1 mx-auto"
-                  :class="{ 'bg-green-500': answerResult === 'correct' }"
-                ></div>
-                <span class="text-xs text-gray-600">正解</span>
-              </div>
-              <div v-if="showWrongLight" class="text-center">
-                <div
-                  class="w-4 h-4 rounded-full mb-1 mx-auto"
-                  :class="{ 'bg-red-500': answerResult === 'wrong' }"
-                ></div>
-                <span class="text-xs text-gray-600">不正解</span>
-              </div>
-              <div v-if="showAlmostLight" class="text-center">
-                <div
-                  class="w-4 h-4 rounded-full mb-1 mx-auto"
-                  :class="{ 'bg-yellow-500': answerResult === 'almost' }"
-                ></div>
-                <span class="text-xs text-gray-600">おしい</span>
-              </div>
+        <div v-else-if="hasAnswered" class="space-y-4">
+          <p class="text-center text-gray-600">回答を送信しました</p>
+          
+          <!-- 回答结果指示灯 -->
+          <div class="flex justify-center space-x-6">
+            <div v-if="showCorrectLight" class="text-center">
+              <div
+                class="w-4 h-4 rounded-full mb-1 mx-auto"
+                :class="{ 'bg-green-500': answerResult === 'correct' }"
+              ></div>
+              <span class="text-xs text-gray-600">正解</span>
             </div>
+            <div v-if="showWrongLight" class="text-center">
+              <div
+                class="w-4 h-4 rounded-full mb-1 mx-auto"
+                :class="{ 'bg-red-500': answerResult === 'wrong' }"
+              ></div>
+              <span class="text-xs text-gray-600">不正解</span>
+            </div>
+            <div v-if="showAlmostLight" class="text-center">
+              <div
+                class="w-4 h-4 rounded-full mb-1 mx-auto"
+                :class="{ 'bg-yellow-500': answerResult === 'almost' }"
+              ></div>
+              <span class="text-xs text-gray-600">おしい</span>
+            </div>
+          </div>
+        </div>
 
-            <!-- 显示正确答案 -->
-            <div v-if="showingAnswer" class="mt-4">
-              <p class="text-sm text-gray-600 mb-2">正解:</p>
-              <p class="text-lg font-medium text-green-600">
-                {{ getOptionLabel(correctOption) }}
-              </p>
-            </div>
-          </div>
-          <div v-else class="text-gray-600">
-            次の問題をお待ちください
-          </div>
+        <!-- 等待下一题 -->
+        <div v-else class="text-center py-8 text-gray-600">
+          次の問題をお待ちください
         </div>
 
         <!-- 教示文按钮 -->
@@ -155,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { WebSocketClient } from '../utils/websocket'
 import type { TestOption } from '../types'
 
@@ -173,6 +169,7 @@ const answerResult = ref<'correct' | 'wrong' | 'almost' | null>(null)
 const showingAnswer = ref(false)
 const correctOption = ref('')
 const showInstruction = ref(false)
+let answerStartTime = 0
 
 // 配置
 const currentOptions = ref<TestOption[]>([])
@@ -193,12 +190,12 @@ const connectionStatusText = computed(() => {
   }
 })
 
-// WebSocket 连接
-const connectToServer = () => {
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+// WebSocket 通信
+let ws: WebSocketClient | null = null
 
-  const ws = new WebSocketClient(wsUrl)
+const connectToServer = () => {
+  const wsUrl = `ws://${window.location.hostname}:8080`
+  ws = new WebSocketClient(wsUrl)
   
   ws.on('connection-status', (status) => {
     connectionStatus.value = status
@@ -206,28 +203,34 @@ const connectToServer = () => {
 
   ws.on('test-start', (data) => {
     testStarted.value = true
-    currentQuestionIndex.value = data.currentQuestionIndex
-    totalQuestions.value = data.totalQuestions
-    currentOptions.value = data.options
-    instruction.value = data.instruction
-    showPlayingIndicator.value = data.lightSettings.showPlayingIndicator
-    showCorrectLight.value = data.lightSettings.showCorrectLight
-    showWrongLight.value = data.lightSettings.showWrongLight
-    showAlmostLight.value = data.lightSettings.showAlmostLight
+    currentQuestionIndex.value = data.currentQuestion
+    totalQuestions.value = data.test.sequences.length
+    currentOptions.value = data.test.options
+    instruction.value = data.test.instruction
+    
+    // 设置指示灯配置
+    const lightSettings = data.test.lightSettings
+    showPlayingIndicator.value = lightSettings.showPlayingIndicator
+    showCorrectLight.value = lightSettings.showCorrectLight
+    showWrongLight.value = lightSettings.showWrongLight
+    showAlmostLight.value = lightSettings.showAlmostLight
+
     resetQuestionState()
   })
 
-  ws.on('playing-stage', (data) => {
-    playingStage.value = data.stage
-    remainingTime.value = data.remainingTime
+  ws.on('test-state', (state) => {
+    playingStage.value = state.playingStage
+    remainingTime.value = state.remainingTime
   })
 
   ws.on('can-answer', () => {
     canAnswer.value = true
+    answerStartTime = Date.now()
   })
 
   ws.on('answer-result', (data) => {
-    answerResult.value = data.result
+    hasAnswered.value = true
+    answerResult.value = data.isCorrect ? 'correct' : 'wrong'
     if (data.showAnswer) {
       showingAnswer.value = true
       correctOption.value = data.correctOption
@@ -245,7 +248,7 @@ const connectToServer = () => {
     resetQuestionState()
   })
 
-  ws.connect();
+  ws.connect()
 }
 
 const resetQuestionState = () => {
@@ -254,6 +257,7 @@ const resetQuestionState = () => {
   playingStage.value = null
   showingAnswer.value = false
   answerResult.value = null
+  answerStartTime = 0
 }
 
 const submitAnswer = (option: string) => {
@@ -262,21 +266,26 @@ const submitAnswer = (option: string) => {
   hasAnswered.value = true
   canAnswer.value = false
   
-  // 发送答案到服务器
   ws?.send({
     type: 'answer',
-    answer: {
+    data: {
       questionId: currentQuestionIndex.value,
       option,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      startTime: answerStartTime
     }
   })
 }
 
-const getOptionLabel = (value: string) => {
-  return currentOptions.value.find(opt => opt.value === value)?.label || value
-}
+// 生命周期处理
+onMounted(() => {
+  connectToServer()
+})
 
-// 初始化连接
-connectToServer()
+onUnmounted(() => {
+  if (ws) {
+    ws.close()
+    ws = null
+  }
+})
 </script>

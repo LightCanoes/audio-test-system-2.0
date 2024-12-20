@@ -7,6 +7,7 @@ import type { AudioFile } from '../renderer/types'
 export class AudioManager {
   private files: Map<string, AudioFile> = new Map()
   private audioBasePath: string
+  private currentAudio: { id: string, window: BrowserWindow | null } | null = null
 
   constructor(userDataPath: string) {
     if (!userDataPath) {

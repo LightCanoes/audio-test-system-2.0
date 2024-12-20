@@ -2,24 +2,23 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import { EventEmitter } from 'events'
 import * as http from 'http'
-import { URL } from 'url'
-import type { TestSettings, TestSequence } from '../renderer/types'
+import type { TestSettings, TestSequence, } from '../renderer/types'
+
+interface Student {
+  id: string
+  answers: Answer[]
+  correctCount: number
+  totalAnswered: number
+  correctRate: number
+  currentAnswer?: string
+}
 
 interface Answer {
   questionId: number
   option: string
   timestamp: number
   startTime: number
-}
-
-interface Student {
-  id: string
-  name?: string
-  answers: Answer[]
-  currentAnswer?: string
-  correctCount: number
-  totalAnswered: number
-  correctRate: number
+  isCorrect: boolean
 }
 
 interface QuestionStats {
@@ -31,18 +30,6 @@ interface QuestionStats {
   answers: Record<string, { option: string; time: number }>
 }
 
-interface TestStats {
-  currentQuestionStats: QuestionStats
-  questionStats: QuestionStats[]
-  overallStats: {
-    totalAnswers: number
-    correctAnswers: number
-    correctRate: number
-    averageTime: number
-  }
-  students: Student[]
-}
-
 export class TestManager extends EventEmitter {
   private server: http.Server
   private wss: WebSocketServer | null = null
@@ -50,86 +37,34 @@ export class TestManager extends EventEmitter {
   private test: TestSettings | null = null
   private currentQuestionIndex: number = -1
 
-  private stats: TestStats | null = null
-  private audioBasePath: string = ''
+  private stats: {
+    currentQuestionStats: QuestionStats
+    questionStats: QuestionStats[]
+    overallStats: {
+      totalAnswers: number
+      correctAnswers: number
+      correctRate: number
+      averageTime: number
+    }
+    students: Student[]
+  } | null = null
 
-  private broadcastStudentList() {
-    if (!this.wss) return
-
-    const studentList = Array.from(this.students.values()).map(student => ({
-      id: student.id,
-      correctRate: student.correctRate,
-      totalAnswered: student.totalAnswered
-    }))
-
-    this.wss.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        try {
-          client.send(JSON.stringify({
-            type: 'student-list',
-            data: studentList
-          }))
-        } catch (error) {
-          console.error('Error broadcasting student list:', error)
-        }
-      }
-    })
+  private testState = {
+    isStarted: false,
+    isPlaying: false,
+    isPaused: false,
+    playingStage: null as 'wait' | 'audio1' | 'pause' | 'audio2' | 'answer' | null,
+    remainingTime: 0
   }
 
-  constructor(audioBasePath: string = '') {
+  constructor() {
     super()
     this.server = http.createServer((req, res) => {
-      if (req.url === '/' || req.url === '/student') {
-        res.writeHead(200, { 'Content-Type': 'text/html' })
-        res.end(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta charset="utf-8">
-              <title>Audio Test Student</title>
-            </head>
-            <body>
-              <div id="app">
-                <h1>Audio Test Student</h1>
-                <p id="status">Connecting to server...</p>
-              </div>
-              <script>
-                try {
-                  // 直接使用当前地址
-                  const ws = new WebSocket('ws://' + location.host);
-                  
-                  ws.onopen = () => {
-                    console.log('Connected to server');
-                    document.getElementById('status').textContent = 'Connected to server';
-                  };
-                  
-                  ws.onmessage = (event) => {
-                    console.log('Received message:', event.data);
-                    document.getElementById('status').textContent = 'Message: ' + event.data;
-                  };
-                  
-                  ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    document.getElementById('status').textContent = 'Connection error';
-                  };
-                  
-                  ws.onclose = () => {
-                    console.log('Disconnected from server');
-                    document.getElementById('status').textContent = 'Disconnected from server';
-                  };
-                } catch (error) {
-                  console.error('Error creating WebSocket:', error);
-                  document.getElementById('status').textContent = 'Failed to create connection: ' + error;
-                }
-              </script>
-            </body>
-          </html>
-        `)
-      } else {
-        console.log('404 for:', req.url)
-        res.writeHead(404)
-        res.end()
-      }
+      // 重定向到 Vite 开发服务器
+      res.writeHead(301, {
+        'Location': 'http://localhost:5173/#/student'  // 使用 hash 路由
+      })
+      res.end()
     })
   }
 
@@ -141,13 +76,11 @@ export class TestManager extends EventEmitter {
       this.server.listen(8080, () => {
         console.log('HTTP server is running on port 8080')
 
-        // 创建 WebSocket 服务器，不指定 path
+        // 创建 WebSocket 服务器
         this.wss = new WebSocketServer({ 
           server: this.server,
-          // 移除 path 配置，让它处理所有 WebSocket 请求
           perMessageDeflate: false
         })
-
 
         this.setupServerHandlers()
       })
@@ -164,7 +97,7 @@ export class TestManager extends EventEmitter {
     if (!this.wss) return
 
     this.wss.on('connection', (ws: WebSocket) => {
-      console.log('New client connected')
+      console.log('New WebSocket connection established')
       const clientId = Date.now().toString()
       
       // 初始化学生数据
@@ -182,7 +115,8 @@ export class TestManager extends EventEmitter {
           type: 'init',
           data: {
             test: this.test,
-            currentQuestion: this.currentQuestionIndex
+            currentQuestion: this.currentQuestionIndex,
+            testState: this.testState
           }
         }))
       }
@@ -205,137 +139,103 @@ export class TestManager extends EventEmitter {
       // 发送当前学生列表
       this.broadcastStudentList()
     })
-
-    this.wss.on('error', (error) => {
-      console.error('WebSocket server error:', error)
-    })
-  }
-
-
-
-  private getAudioPath(fileId: string): string {
-    if (!this.test?.audioFiles) return ''
-    const audioFile = this.test.audioFiles.find(f => f.id === fileId)
-    return audioFile ? audioFile.path : ''
   }
 
   private handleMessage(clientId: string, message: any, ws: WebSocket) {
     const student = this.students.get(clientId)
+    if (!student) return
 
     switch (message.type) {
       case 'answer':
-        if (student && this.test) {
-          const answer = message.answer
-          const question = this.test.sequences[this.currentQuestionIndex]
-          const isCorrect = answer.option === question.correctOption
-
-          // 更新学生答案
-          student.answers.push(answer)
-          student.currentAnswer = answer.option
-          if (isCorrect) student.correctCount++
-          student.totalAnswered++
-          student.correctRate = (student.correctCount / student.totalAnswered) * 100
-
-          // 更新统计
-          this.updateStats(student, answer, isCorrect)
-
-          // 通知教师新答案
-          this.broadcastToTeachers({
-            type: 'answer-submitted',
-            studentId: clientId,
-            answer: {
-              ...answer,
-              isCorrect
-            }
-          })
-
-          // 通知学生答案结果
-          this.sendToClient(ws, {
-            type: 'answer-result',
-            result: isCorrect ? 'correct' : 'wrong'
-          })
-        }
-        break
-
-      case 'request-stats':
-        if (this.stats) {
-          this.sendToClient(ws, {
-            type: 'stats-update',
-            stats: this.stats
-          })
-        }
+        this.handleAnswer(student, message.data, ws)
         break
     }
   }
 
-  private updateStats(student: Student, answer: Answer, isCorrect: boolean) {
-    if (!this.stats) {
-      this.initializeStats()
+  private handleAnswer(student: Student, answer: Answer, ws: WebSocket) {
+    if (!this.test || !this.testState.isStarted) return
+
+    const sequence = this.test.sequences[this.currentQuestionIndex]
+    const isCorrect = answer.option === sequence.correctOption
+
+    // 更新学生统计
+    student.answers.push({
+      ...answer,
+      isCorrect
+    })
+    student.currentAnswer = answer.option
+    if (isCorrect) student.correctCount++
+    student.totalAnswered++
+    student.correctRate = (student.correctCount / student.totalAnswered) * 100
+
+    // 更新问题统计
+    this.updateQuestionStats(student, answer, isCorrect)
+
+    // 发送结果给学生
+    ws.send(JSON.stringify({
+      type: 'answer-result',
+      data: {
+        isCorrect,
+        correctOption: sequence.correctOption
+      }
+    }))
+
+    // 广播更新
+    this.broadcastStudentList()
+    this.broadcastStats()
+  }
+
+  private updateQuestionStats(student: Student, answer: Answer, isCorrect: boolean) {
+    if (!this.stats) this.initializeStats()
+    if (!this.stats) return
+
+    const currentStats = this.stats.currentQuestionStats
+    const questionStats = this.stats.questionStats[this.currentQuestionIndex]
+
+    // 更新当前问题统计
+    currentStats.totalAnswers++
+    if (isCorrect) currentStats.correctAnswers++
+    currentStats.correctRate = (currentStats.correctAnswers / currentStats.totalAnswers) * 100
+    currentStats.optionCounts[answer.option] = (currentStats.optionCounts[answer.option] || 0) + 1
+    currentStats.answers[student.id] = {
+      option: answer.option,
+      time: answer.timestamp - answer.startTime
     }
 
-    if (this.stats) {
-      const currentStats = this.stats.currentQuestionStats
-      const questionStats = this.stats.questionStats[this.currentQuestionIndex]
+    // 更新问题统计历史
+    Object.assign(questionStats, currentStats)
 
-      // 更新当前问题统计
-      currentStats.totalAnswers++
-      if (isCorrect) currentStats.correctAnswers++
-      currentStats.correctRate = (currentStats.correctAnswers / currentStats.totalAnswers) * 100
-      currentStats.optionCounts[answer.option] = (currentStats.optionCounts[answer.option] || 0) + 1
-      currentStats.answers[student.id] = { option: answer.option, time: answer.timestamp - answer.startTime }
-      currentStats.averageTime = Object.values(currentStats.answers)
-        .reduce((sum, a) => sum + a.time, 0) / currentStats.totalAnswers
+    // 更新总体统计
+    const totalAnswers = this.stats.questionStats.reduce((sum, q) => sum + q.totalAnswers, 0)
+    const totalCorrect = this.stats.questionStats.reduce((sum, q) => sum + q.correctAnswers, 0)
+    const totalTime = this.stats.questionStats.reduce((sum, q) => {
+      const times = Object.values(q.answers).map(a => a.time)
+      return sum + (times.reduce((a, b) => a + b, 0) / times.length || 0)
+    }, 0)
 
-      // 更新问题统计历史
-      questionStats.totalAnswers = currentStats.totalAnswers
-      questionStats.correctAnswers = currentStats.correctAnswers
-      questionStats.correctRate = currentStats.correctRate
-      questionStats.averageTime = currentStats.averageTime
-      questionStats.optionCounts = { ...currentStats.optionCounts }
-      questionStats.answers = { ...currentStats.answers }
-
-      // 更新总体统计
-      const totalAnswers = this.stats.questionStats.reduce((sum, q) => sum + q.totalAnswers, 0)
-      const totalCorrect = this.stats.questionStats.reduce((sum, q) => sum + q.correctAnswers, 0)
-      const totalTime = this.stats.questionStats.reduce((sum, q) => sum + q.averageTime * q.totalAnswers, 0)
-
-      this.stats.overallStats = {
-        totalAnswers,
-        correctAnswers: totalCorrect,
-        correctRate: totalAnswers > 0 ? (totalCorrect / totalAnswers) * 100 : 0,
-        averageTime: totalAnswers > 0 ? totalTime / totalAnswers : 0
-      }
-
-      // 广播统计更新
-      this.broadcastToTeachers({
-        type: 'stats-update',
-        stats: this.stats
-      })
+    this.stats.overallStats = {
+      totalAnswers,
+      correctAnswers: totalCorrect,
+      correctRate: totalAnswers > 0 ? (totalCorrect / totalAnswers) * 100 : 0,
+      averageTime: totalAnswers > 0 ? totalTime / this.stats.questionStats.length : 0
     }
   }
 
   private initializeStats() {
     if (!this.test) return
 
-    const questionStats = this.test.sequences.map(() => ({
+    const emptyStats = () => ({
       totalAnswers: 0,
       correctAnswers: 0,
       correctRate: 0,
       averageTime: 0,
       optionCounts: {},
       answers: {}
-    }))
+    })
 
     this.stats = {
-      currentQuestionStats: {
-        totalAnswers: 0,
-        correctAnswers: 0,
-        correctRate: 0,
-        averageTime: 0,
-        optionCounts: {},
-        answers: {}
-      },
-      questionStats,
+      currentQuestionStats: emptyStats(),
+      questionStats: Array(this.test.sequences.length).fill(null).map(() => emptyStats()),
       overallStats: {
         totalAnswers: 0,
         correctAnswers: 0,
@@ -346,91 +246,227 @@ export class TestManager extends EventEmitter {
     }
   }
 
-  private broadcastToTeachers(message: any) {
+  public startTest(testData: TestSettings): boolean {
+    if (!this.wss || this.testState.isStarted) return false
+    
+    try {
+      this.test = testData
+      this.currentQuestionIndex = 0
+      
+      this.testState = {
+        isStarted: true,
+        isPlaying: true,
+        isPaused: false,
+        playingStage: 'wait',
+        remainingTime: this.test.sequences[0].waitTime
+      }
+
+      this.initializeStats()
+      
+      // 广播测试开始
+      this.broadcastToAll({
+        type: 'test-start',
+        data: {
+          test: this.test,
+          currentQuestion: this.currentQuestionIndex,
+          testState: this.testState
+        }
+      })
+
+      // 开始第一个问题
+      this.startCurrentQuestion()
+      return true
+    } catch (error) {
+      console.error('Error starting test:', error)
+      return false
+    }
+  }
+
+  public pauseTest(): boolean {
+    if (!this.testState.isStarted || this.testState.isPaused) return false
+
+    this.testState.isPlaying = false
+    this.testState.isPaused = true
+    this.broadcastTestState()
+
+    return true
+  }
+
+  public resumeTest(): boolean {
+    if (!this.testState.isStarted || !this.testState.isPaused) return false
+
+    this.testState.isPlaying = true
+    this.testState.isPaused = false
+    this.broadcastTestState()
+
+    return true
+  }
+
+  public stopTest(): boolean {
+    if (!this.testState.isStarted) return false
+
+    this.testState = {
+      isStarted: false,
+      isPlaying: false,
+      isPaused: false,
+      playingStage: null,
+      remainingTime: 0
+    }
+
+    // 广播测试结束和最终统计
+    this.broadcastToAll({
+      type: 'test-end',
+      data: {
+        stats: this.stats
+      }
+    })
+
+    return true
+  }
+
+  private startCurrentQuestion() {
+    if (!this.test || !this.testState.isStarted || this.testState.isPaused) return
+
+    const sequence = this.test.sequences[this.currentQuestionIndex]
+    this.runQuestionSequence(sequence)
+  }
+
+  private async runQuestionSequence(sequence: TestSequence) {
+    // 等待时间
+    this.updateStage('wait', sequence.waitTime)
+    await this.wait(sequence.waitTime)
+    if (!this.testState.isPlaying) return
+
+    // 音频1
+    this.updateStage('audio1', 0)
+    this.broadcastToAll({
+      type: 'play-audio',
+      data: { audioId: sequence.audio1 }
+    })
+    await this.wait(5) // 假设音频长度为5秒
+    if (!this.testState.isPlaying) return
+
+    // 休止时间
+    this.updateStage('pause', sequence.pauseTime)
+    await this.wait(sequence.pauseTime)
+    if (!this.testState.isPlaying) return
+
+    // 音频2
+    this.updateStage('audio2', 0)
+    this.broadcastToAll({
+      type: 'play-audio',
+      data: { audioId: sequence.audio2 }
+    })
+    await this.wait(5) // 假设音频长度为5秒
+    if (!this.testState.isPlaying) return
+
+    // 回答时间
+    this.updateStage('answer', sequence.answerTime)
+    this.broadcastToAll({ type: 'can-answer' })
+    await this.wait(sequence.answerTime)
+    if (!this.testState.isPlaying) return
+
+    // 显示答案
+    this.showAnswer()
+    await this.wait(5)
+    if (!this.testState.isPlaying) return
+
+    this.nextQuestion()
+  }
+
+  private wait(seconds: number): Promise<void> {
+    return new Promise(resolve => {
+      let remaining = seconds
+      const timer = setInterval(() => {
+        if (this.testState.isPaused) {
+          clearInterval(timer)
+          resolve()
+          return
+        }
+
+        remaining--
+        this.testState.remainingTime = remaining
+        this.broadcastTestState()
+
+        if (remaining <= 0) {
+          clearInterval(timer)
+          resolve()
+        }
+      }, 1000)
+    })
+  }
+
+  private updateStage(stage: typeof this.testState.playingStage, remainingTime: number) {
+    this.testState.playingStage = stage
+    this.testState.remainingTime = remainingTime
+    this.broadcastTestState()
+  }
+
+  private showAnswer() {
+    if (!this.test) return
+
+    const sequence = this.test.sequences[this.currentQuestionIndex]
+    this.broadcastToAll({
+      type: 'show-answer',
+      data: { correctOption: sequence.correctOption }
+    })
+  }
+
+   nextQuestion() {
+    if (!this.test) return
+
+    this.currentQuestionIndex++
+    if (this.currentQuestionIndex >= this.test.sequences.length) {
+      this.stopTest()
+    } else {
+      this.startCurrentQuestion()
+    }
+  }
+
+  private broadcastStudentList() {
+    const studentList = Array.from(this.students.values()).map(student => ({
+      id: student.id,
+      correctRate: student.correctRate,
+      totalAnswered: student.totalAnswered,
+      currentAnswer: student.currentAnswer
+    }))
+
+    this.broadcastToAll({
+      type: 'student-list',
+      data: studentList
+    })
+  }
+
+  private broadcastStats() {
+    if (!this.stats) return
+
+    this.broadcastToAll({
+      type: 'stats-update',
+      data: this.stats
+    })
+  }
+
+  private broadcastTestState() {
+    this.broadcastToAll({
+      type: 'test-state',
+      data: this.testState
+    })
+  }
+
+  private broadcastToAll(message: any) {
     if (!this.wss) return
-  
+
     this.wss.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
         try {
-          const isTeacher = (client as any)._isTeacher
-          if (isTeacher) {
-            client.send(JSON.stringify(message))
-          }
+          client.send(JSON.stringify(message))
         } catch (error) {
-          console.error('Error broadcasting to teachers:', error)
+          console.error('Error broadcasting message:', error)
         }
       }
     })
   }
-  
-  private sendToClient(ws: WebSocket, message: any) {
-    if (ws.readyState === WebSocket.OPEN) {
-      try {
-        ws.send(JSON.stringify(message))
-      } catch (error) {
-        console.error('Error sending to client:', error)
-      }
-    }
-  }
-  
-  public startTest(testData: TestSettings): boolean {
-    if (!this.wss) return false
-    
-    this.test = testData
-    this.currentQuestionIndex = 0
-    
-    // 广播测试开始消息
-    this.wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({
-          type: 'test-start',
-          data: {
-            test: this.test,
-            currentQuestion: this.currentQuestionIndex,
-            totalQuestions: this.test.sequences.length
-          }
-        }))
-      }
-    })
-    
-    return true
-  }
-  
-  nextQuestion() {
-    if (!this.test || this.currentQuestionIndex >= this.test.sequences.length - 1) return
-  
-    this.currentQuestionIndex++
-    const question = this.test.sequences[this.currentQuestionIndex]
-  
-    this.wss?.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        this.sendToClient(client, {
-          type: 'next-question',
-          questionIndex: this.currentQuestionIndex,
-          options: question.options
-        })
-      }
-    })
-  }
-  
-  endTest() {
-    if (!this.test) return
-  
-    this.wss?.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        this.sendToClient(client, {
-          type: 'test-end',
-          stats: this.stats
-        })
-      }
-    })
-  
-    // Reset test state
-    this.test = null
-    this.currentQuestionIndex = -1
-    this.stats = null
-  }
-  
+
   public stopServer(): void {
     if (this.wss) {
       this.wss.close(() => {

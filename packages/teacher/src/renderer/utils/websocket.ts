@@ -1,15 +1,17 @@
+// src/renderer/utils/websocket.ts
 export class WebSocketClient {
   private ws: WebSocket | null = null
+  private handlers: Map<string, ((data: any) => void)[]> = new Map()
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectTimeout = 3000
-  private handlers: Map<string, ((data: any) => void)[]> = new Map()
   private pendingMessages: any[] = []
 
   constructor(private url: string) {}
 
   connect() {
     try {
+      console.log('Connecting to:', this.url)
       this.ws = new WebSocket(this.url)
       this.setupEventListeners()
     } catch (error) {
@@ -22,10 +24,11 @@ export class WebSocketClient {
     if (!this.ws) return
 
     this.ws.onopen = () => {
+      console.log('WebSocket connected')
       this.reconnectAttempts = 0
       this.emit('connection-status', 'connected')
       
-      // 接続時に保留中のメッセージを送信
+      // 发送待处理的消息
       while (this.pendingMessages.length > 0) {
         const message = this.pendingMessages.shift()
         this.send(message)
@@ -33,6 +36,7 @@ export class WebSocketClient {
     }
 
     this.ws.onclose = () => {
+      console.log('WebSocket disconnected')
       this.emit('connection-status', 'disconnected')
       this.handleReconnect()
     }
@@ -45,6 +49,7 @@ export class WebSocketClient {
     this.ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data)
+        console.log('Received message:', message)
         this.handleMessage(message)
       } catch (error) {
         console.error('Error parsing message:', error)
@@ -66,9 +71,9 @@ export class WebSocketClient {
     }, this.reconnectTimeout)
   }
 
-  private handleMessage(message: { type: string, [key: string]: any }) {
+  private handleMessage(message: { type: string, data?: any }) {
     const handlers = this.handlers.get(message.type) || []
-    handlers.forEach(handler => handler(message))
+    handlers.forEach(handler => handler(message.data))
   }
 
   on(event: string, handler: (data: any) => void) {
@@ -82,6 +87,7 @@ export class WebSocketClient {
     if (this.ws?.readyState === WebSocket.OPEN) {
       try {
         const stringMessage = JSON.stringify(message)
+        console.log('Sending message:', message)
         this.ws.send(stringMessage)
       } catch (error) {
         console.error('Error sending message:', error)
@@ -99,5 +105,10 @@ export class WebSocketClient {
       this.handlers.clear()
       this.pendingMessages = []
     }
+  }
+
+  private emit(event: string, data?: any) {
+    const handlers = this.handlers.get(event) || []
+    handlers.forEach(handler => handler(data))
   }
 }

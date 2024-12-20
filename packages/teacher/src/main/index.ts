@@ -155,7 +155,16 @@ const setupIpcHandlers = () => {
 
   // テスト制御
   ipcMain.handle('start-test', async (_, testData) => {
-    return testManager?.startTest(testData)
+    try {
+      if (!testManager) {
+        throw new Error('Test manager not initialized')
+      }
+      console.log('Starting test with data:', testData)
+      return testManager.startTest(testData)
+    } catch (error) {
+      console.error('Failed to start test:', error)
+      throw error
+    }
   })
   ipcMain.handle('pause-test', () => testManager?.pauseTest())
   ipcMain.handle('resume-test', () => testManager?.resumeTest())

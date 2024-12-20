@@ -1,6 +1,11 @@
 // src/preload/index.ts
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AudioFile, TestSettings } from '../renderer/types'
+import type { 
+  AudioFile, 
+  TestSettings, 
+  StudentStats, 
+  QuestionStats 
+} from '../renderer/types'
 
 // 类型定义
 type AudioControlEvent = {
@@ -52,8 +57,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('create-test-window', testData),
   
   // テスト制御
-  startTest: (testData: TestSettings) => 
-    ipcRenderer.invoke('start-test', testData),
+  startTest: (testData: TestSettings) => ipcRenderer.invoke('start-test', testData) as Promise<boolean>,
   
   pauseTest: () => ipcRenderer.invoke('pause-test'),
   resumeTest: () => ipcRenderer.invoke('resume-test'),
@@ -81,6 +85,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     ipcRenderer.on('init-test-data', (_, data) => callback(data))
     return cleanup
+  },
+  onStudentListUpdate: (callback: (students: StudentStats[]) => void) => {
+    const cleanup = () => {
+      ipcRenderer.removeAllListeners('student-list-update')
+    }
+    
+    ipcRenderer.on('student-list-update', (_, data) => callback(data))
+    return cleanup
+  },
+
+  onStatsUpdate: (callback: (stats: {
+    currentQuestionStats: QuestionStats
+    questionStats: QuestionStats[]
+    overallStats: {
+      totalAnswers: number
+      correctAnswers: number
+      correctRate: number
+      averageTime: number
+    }
+  }) => void) => {
+    const cleanup = () => {
+      ipcRenderer.removeAllListeners('stats-update')
+    }
+    
+    ipcRenderer.on('stats-update', (_, data) => callback(data))
+    return cleanup
   }
 })
 
@@ -107,7 +137,7 @@ declare global {
       
       createTestWindow: (testData: TestSettings) => Promise<void>
       
-      startTest: (testData: TestSettings) => Promise<void>
+      startTest: (testData: TestSettings) => Promise<boolean>
       pauseTest: () => Promise<void>
       resumeTest: () => Promise<void>
       stopTest: () => Promise<void>
@@ -117,6 +147,17 @@ declare global {
       
       onTestStateUpdate: (callback: (state: any) => void) => () => void
       onInitTestData: (callback: (data: TestSettings) => void) => () => void
+      onStudentListUpdate: (callback: (students: StudentStats[]) => void) => () => void
+      onStatsUpdate: (callback: (stats: {
+        currentQuestionStats: QuestionStats
+        questionStats: QuestionStats[]
+        overallStats: {
+          totalAnswers: number
+          correctAnswers: number
+          correctRate: number
+          averageTime: number
+        }
+      }) => void) => () => void
     }
   }
 }
