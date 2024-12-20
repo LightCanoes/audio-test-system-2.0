@@ -586,6 +586,7 @@ const handleStatsUpdate = (stats: {
 
 // 初期化とクリーンアップ
 onMounted(async () => {
+  console.log('Test window mounted, setting up handlers')
   // サーバーアドレス取得
   try {
     const addresses = await window.electronAPI.getNetworkAddresses()
@@ -596,10 +597,13 @@ onMounted(async () => {
   }
 
   // テストデータ初期化
-  window.electronAPI.onInitTestData((data) => {
-    test.value = data
+  const cleanup = window.electronAPI.onInitTestData((data) => {
+    console.log('Test window received initial data:', data)
+    if (data) {
+      test.value = data
+      console.log('Test data set:', test.value)
+    }
   })
-
   // 状態更新の監視
   window.electronAPI.onTestStateUpdate((state) => {
     playingStage.value = state.playingStage
@@ -614,6 +618,11 @@ onMounted(async () => {
 
   // 統計更新の監視
   window.electronAPI.onStatsUpdate(handleStatsUpdate)
+
+  onUnmounted(() => {
+    cleanup()
+  })
+  
 })
 
 onUnmounted(() => {

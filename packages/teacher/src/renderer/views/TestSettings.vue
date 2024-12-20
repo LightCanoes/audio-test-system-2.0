@@ -930,7 +930,7 @@ const startTest = async () => {
         comment: file.comment
       }))
     }))
-
+    console.log('Sending test data to main process:', testData)
     await window.electronAPI.createTestWindow(testData)
   } catch (error) {
     console.error('Error starting test:', error)

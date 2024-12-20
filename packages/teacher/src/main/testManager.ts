@@ -97,7 +97,7 @@ export class TestManager extends EventEmitter {
     if (!this.wss) return
 
     this.wss.on('connection', (ws: WebSocket) => {
-      console.log('New WebSocket connection established')
+      console.log('New client connected')
       const clientId = Date.now().toString()
       
       // 初始化学生数据
@@ -412,6 +412,13 @@ export class TestManager extends EventEmitter {
     })
   }
 
+  setTestData(data: TestSettings) {
+    this.test = data
+  }
+
+  getTestData() {
+    return this.test
+  }
    nextQuestion() {
     if (!this.test) return
 

@@ -79,11 +79,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   
   onInitTestData: (callback: (data: TestSettings) => void) => {
+    console.log('Registering onInitTestData handler')
     const cleanup = () => {
       ipcRenderer.removeAllListeners('init-test-data')
     }
     
-    ipcRenderer.on('init-test-data', (_, data) => callback(data))
+    ipcRenderer.on('init-test-data', (_, data) => {
+      console.log('Preload received init-test-data:', data)
+      callback(data)
+    })
     return cleanup
   },
   onStudentListUpdate: (callback: (students: StudentStats[]) => void) => {
